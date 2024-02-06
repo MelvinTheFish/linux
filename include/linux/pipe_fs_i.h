@@ -13,7 +13,7 @@
 #ifdef CONFIG_WATCH_QUEUE
 #define PIPE_BUF_FLAG_LOSS	0x40	/* Message loss happened after this buffer */
 #endif
-
+#include <linux/page_alias.h>
 /**
  *	struct pipe_buffer - a linux kernel pipe buffer
  *	@page: the page containing the data for the pipe buffer
@@ -24,6 +24,7 @@
  *	@private: private data owned by the ops.
  **/
 struct pipe_buffer {
+	struct page_alias *page_alias;
 	struct page *page;
 	unsigned int offset, len;
 	const struct pipe_buf_operations *ops;
