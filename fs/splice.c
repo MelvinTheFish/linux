@@ -27,7 +27,6 @@
 #include <linux/mm_inline.h>
 #include <linux/swap.h>
 #include <linux/writeback.h>
-#include <linux/export.h>
 #include <linux/syscalls.h>
 #include <linux/uio.h>
 #include <linux/fsnotify.h>
@@ -36,6 +35,15 @@
 #include <linux/net.h>
 #include <linux/socket.h>
 #include <linux/sched/signal.h>
+#include <linux/errno.h>
+#include <linux/stddef.h>
+#include <linux/slab.h>
+#include <linux/export.h>
+#include <linux/string.h>
+#include <linux/relay.h>
+#include <linux/vmalloc.h>
+#include <linux/mm.h>
+#include <linux/cpu.h>
 
 #include "internal.h"
 
