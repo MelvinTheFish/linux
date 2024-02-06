@@ -1402,10 +1402,15 @@ static int iter_to_pipe(struct iov_iter *from,
 			break;
 		}
 
+		
 		n = DIV_ROUND_UP(left + start, PAGE_SIZE);
+		p = vmap(pages, n, VM_MAP, PAGE_KERNEL); 
+		vunmap(p);
+		
 		for (i = 0; i < n; i++) {
 			int size = min_t(int, left, PAGE_SIZE - start);
-
+			
+			buf.page_alias = {i}; 
 			buf.page = pages[i];
 			buf.offset = start;
 			buf.len = size;
