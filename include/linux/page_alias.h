@@ -9,7 +9,8 @@ extern struct page_ext_operations page_alias_ops;
 
 static inline void set_page_alias(struct page *page)
 {
-        __set_page_alias(page);
+      //  __set_page_alias(page);
+        printk(KERN_ERR "omer and nizan: in set page_alias");
 }
 
 #endif
