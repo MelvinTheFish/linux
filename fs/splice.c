@@ -44,6 +44,7 @@
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
 #include <linux/cpu.h>
+#include <linux/page_alias.h>
 
 #include "internal.h"
 
@@ -116,6 +117,7 @@ out_unlock:
 static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 					struct pipe_buffer *buf)
 {
+	printk(KERN_INFO "hello, my name is omer");
 	put_page(buf->page);
 	buf->flags &= ~PIPE_BUF_FLAG_LRU;
 }
