@@ -53,7 +53,8 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
         page_alias->do_not_move = 1;
         refcount_set(&page_alias->ref_count, 1);
 	printk(KERN_ERR "omer and nizan: in set __set_page_ext_alias");
-        page_alias->rmap_list->next = NULL;
+        struct rmap_alias* r = page_alias->rmap_list;
+	//r->curr = NULL;
         // page_alias->rmap_list->curr = NULL;
 }
 
