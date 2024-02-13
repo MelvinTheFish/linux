@@ -1397,7 +1397,7 @@ static int iter_to_pipe(struct iov_iter *from,
 	};
 	size_t total = 0;
 	int ret = 0;
-
+	void *p = NULL;
 	while (iov_iter_count(from)) {
 		struct page *pages[16];
 		ssize_t left;
@@ -1412,12 +1412,12 @@ static int iter_to_pipe(struct iov_iter *from,
 
 		
 		n = DIV_ROUND_UP(left + start, PAGE_SIZE);
-		void *p = vmap(pages, n, VM_MAP, PAGE_KERNEL); 
-		vunmap(p);
+		p = alias_vmap(pages, n);
 		
 		for (i = 0; i < n; i++) {
 			int size = min_t(int, left, PAGE_SIZE - start);
-			
+			buf.vmap_ptr = p + i * PAGE_SIZE;
+			add_to_alias_rmap(pages[i], p + i * PAGE_SIZE); 
 			buf.page = pages[i];
 			buf.offset = start;
 			buf.len = size;
@@ -1433,8 +1433,11 @@ static int iter_to_pipe(struct iov_iter *from,
 			left -= size;
 			start = 0;
 		}
+		alias_vunmap(p);
 	}
 out:
+	if (p)
+		alias_vunmap(p);
 	return total ? total : ret;
 }
 
