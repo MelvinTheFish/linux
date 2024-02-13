@@ -1452,11 +1452,11 @@ static int iter_to_pipe(struct iov_iter *from,
 			left -= size;
 			start = 0;
 		}
-		alias_vunmap(p);
+		//alias_vunmap(p);
 	}
 out:
-	if (p)
-		alias_vunmap(p);
+	//if (p)
+		//alias_vunmap(p);
 	return total ? total : ret;
 }
 
