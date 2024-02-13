@@ -2035,6 +2035,8 @@ static int store_status(int __user *status, int start, int value, int nr)
 static int do_move_pages_to_node(struct mm_struct *mm,
 		struct list_head *pagelist, int node)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in do_move_pages_to_node");
+
 	int err;
 	struct migration_target_control mtc = {
 		.nid = node,
@@ -2060,6 +2062,8 @@ static int do_move_pages_to_node(struct mm_struct *mm,
 static int add_page_for_migration(struct mm_struct *mm, const void __user *p,
 		int node, struct list_head *pagelist, bool migrate_all)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in add_page_for_migration");
+
 	struct vm_area_struct *vma;
 	unsigned long addr;
 	struct page *page;
@@ -2134,6 +2138,7 @@ static int move_pages_and_store_status(struct mm_struct *mm, int node,
 		int start, int i, unsigned long nr_pages)
 {
 	int err;
+	printk(KERN_INFO "OMER AND NIZAN:  in move_pages_and_store_status");
 
 	if (list_empty(pagelist))
 		return 0;
@@ -2165,6 +2170,8 @@ static int do_pages_move(struct mm_struct *mm, nodemask_t task_nodes,
 			 const int __user *nodes,
 			 int __user *status, int flags)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in do_pages_move");
+
 	compat_uptr_t __user *compat_pages = (void __user *)pages;
 	int current_node = NUMA_NO_NODE;
 	LIST_HEAD(pagelist);
@@ -2332,6 +2339,8 @@ static int do_pages_stat(struct mm_struct *mm, unsigned long nr_pages,
 			 const void __user * __user *pages,
 			 int __user *status)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in do_pages_stat");
+
 #define DO_PAGES_STAT_CHUNK_NR 16UL
 	const void __user *chunk_pages[DO_PAGES_STAT_CHUNK_NR];
 	int chunk_status[DO_PAGES_STAT_CHUNK_NR];
@@ -2363,6 +2372,8 @@ static int do_pages_stat(struct mm_struct *mm, unsigned long nr_pages,
 
 static struct mm_struct *find_mm_struct(pid_t pid, nodemask_t *mem_nodes)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in find_mm_struct");
+
 	struct task_struct *task;
 	struct mm_struct *mm;
 
@@ -2417,6 +2428,7 @@ static int kernel_move_pages(pid_t pid, unsigned long nr_pages,
 			     const int __user *nodes,
 			     int __user *status, int flags)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in kernel_move_pages");
 	struct mm_struct *mm;
 	int err;
 	nodemask_t task_nodes;
@@ -2447,6 +2459,7 @@ SYSCALL_DEFINE6(move_pages, pid_t, pid, unsigned long, nr_pages,
 		const int __user *, nodes,
 		int __user *, status, int, flags)
 {
+	printk(KERN_INFO "OMER AND NIZAN:  in SYSCALL_DEFINE6(move_pages");
 	return kernel_move_pages(pid, nr_pages, pages, nodes, status, flags);
 }
 
