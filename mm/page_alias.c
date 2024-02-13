@@ -93,7 +93,6 @@ noinline void __set_page_alias(struct page *page)
 // 	page_ext_put(page_ext); //unlock
 // }
 
-
 void* alias_vmap(struct page **pages, int n){
 	void* vmap_address = vmap(pages, n, VM_MAP, PAGE_KERNEL); 
 	return vmap_address;
