@@ -25,11 +25,9 @@ struct rmap_alias{
         void* curr;
 };
 
-static struct page_alias* get_page_alias(struct page_ext *page_ext) 
+static inline struct page_alias* get_page_alias(struct page_ext *page_ext) 
 { 
-        struct page_alias *page_alias;
-        page_alias = page_ext_data(page_ext, &page_alias_ops);
-        return page_alias;
+        return page_ext_data(page_ext, &page_alias_ops);
 } 
 
 static __init bool need_page_alias(void)
@@ -52,10 +50,10 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
 {
 	struct page_alias *page_alias;
         page_alias = get_page_alias(page_ext);
-        page_alias->do_not_move = 1;
-        refcount_set(&page_alias->ref_count, 1);
-        page_alias->rmap_list->next = NULL;
-        page_alias->rmap_list->curr = NULL;
+        // page_alias->do_not_move = 1;
+        // refcount_set(&page_alias->ref_count, 1);
+        // page_alias->rmap_list->next = NULL;
+        // page_alias->rmap_list->curr = NULL;
 }
 
 noinline void __set_page_alias(struct page *page)
@@ -63,6 +61,8 @@ noinline void __set_page_alias(struct page *page)
 	//printk(KERN_ERR "omer and nizan: in set page_alias");
 	struct page_ext *page_ext;
 	page_ext = page_ext_get(page); //lock
-	// __set_page_ext_alias(page_ext);
+	if (unlikely(!page_ext))
+		return;
+	__set_page_ext_alias(page_ext);
 	page_ext_put(page_ext); //unlock
 }
