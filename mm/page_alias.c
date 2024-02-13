@@ -17,7 +17,7 @@
 struct page_alias{
         int do_not_move: 1;
         refcount_t ref_count;
-        struct rmap_alias* rmap_list;
+        struct rmap_alias rmap_list;
 };
 
 struct rmap_alias{
@@ -54,8 +54,8 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
         refcount_set(&page_alias->ref_count, 1);
 	printk(KERN_ERR "omer and nizan: in set __set_page_ext_alias");
         struct rmap_alias* r = page_alias->rmap_list;
-	//r->curr = NULL;
-        // page_alias->rmap_list->curr = NULL;
+	r.curr = NULL;
+        r.next = NULL;
 }
 
 noinline void __set_page_alias(struct page *page)
