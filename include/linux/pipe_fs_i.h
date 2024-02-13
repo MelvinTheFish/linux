@@ -25,7 +25,7 @@
  **/
 struct pipe_buffer {
 	void *vmap_ptr;
-	//struct page *page;
+	struct page *page;
 	unsigned int offset, len;
 	const struct pipe_buf_operations *ops;
 	unsigned int flags;
