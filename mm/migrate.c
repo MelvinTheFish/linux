@@ -2139,7 +2139,7 @@ static int move_pages_and_store_status(struct mm_struct *mm, int node,
 {
 	int err;
 	printk(KERN_INFO "OMER AND NIZAN:  in move_pages_and_store_status");
-	check_migration_at_start(page_list);
+	check_migration_at_start(pagelist);
 	if (list_empty(pagelist))
 		return 0;
 
