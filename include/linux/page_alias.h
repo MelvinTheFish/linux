@@ -6,6 +6,10 @@
 #ifdef CONFIG_PAGE_ALIAS
 extern void __set_page_alias(struct page *page);
 extern struct page_ext_operations page_alias_ops;
+struct page* alias_vmap_to_page(void *p);
+void* alias_vmap(struct page **pages, int n);
+void alias_vunmap(void* p);
+void alias_page_close(struct page* page);
 
 static inline void set_page_alias(struct page *page)
 {
