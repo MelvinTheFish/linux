@@ -11,6 +11,7 @@ void* alias_vmap(struct page **pages, int n);
 void alias_vunmap(void* p);
 void alias_page_close(struct page* page);
 void add_to_alias_rmap(struct page* page, void* ptr);
+void check_migration_at_start(struct list_head *from);
 
 static inline void set_page_alias(struct page *page)
 {
