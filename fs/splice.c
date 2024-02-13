@@ -7,7 +7,7 @@
  * buffer that you can use to transfer data from one end to the other.
  *
  * The traditional unix read/write is extended with a "splice()" operation
- * that transfers data buffers to or from a pipe buffer.
+ // * that transfers data buffers to or from a pipebuffer.
  *
  * Named by Larry McVoy, original implementation from Linus, extended by
  * Jens to support splicing to files, network, direct splicing, etc and
@@ -119,10 +119,9 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 {
 	
 	//struct page* buf_page = 
-	printk(KERN_INFO "OAN: %d", is_vmalloc_addr(buf->vmap_ptr));
+	//printk(KERN_INFO "OAN: %d", is_vmalloc_addr(buf->vmap_ptr));
 	struct page* page = vmalloc_to_page(buf->vmap_ptr);
 	//printk(KERN_INFO "func1, addr 1: %p", buf_page);
-	printk(KERN_INFO "OAN, addr: %p", (void *)buf->page);
 	printk(KERN_INFO "OAN: is them eq: %d", ((void *)buf->page == (void *)page));
 	// put_page(buf->page);
 	// //alias_page_close(buf_page);
@@ -1424,13 +1423,13 @@ static int iter_to_pipe(struct iov_iter *from,
 		
 		n = DIV_ROUND_UP(left + start, PAGE_SIZE);
 		p = alias_vmap(pages, n);
-		printk(KERN_INFO "NIZAN: eq[0] %d", (void*)vmalloc_to_page(p) == (void*)pages[0]);
-		printk(KERN_INFO "NIZAN: eq[1] %d", ((void*)vmalloc_to_page(p + 1)) == (void*)pages[1]);
-		printk(KERN_INFO "NIZAN: eq[1] %d", (void*)(vmalloc_to_page(p + PAGE_SIZE)) == (void*)pages[1]);
+		// printk(KERN_INFO "NIZAN: eq[0] %d", (void*)vmalloc_to_page(p) == (void*)pages[0]);
+		// printk(KERN_INFO "NIZAN: eq[1] %d", ((void*)vmalloc_to_page(p + 1)) == (void*)pages[1]);
+		// printk(KERN_INFO "NIZAN: eq[1] %d", (void*)(vmalloc_to_page(p + PAGE_SIZE)) == (void*)pages[1]);
 
 		for (i = 0; i < n; i++) {
 			int size = min_t(int, left, PAGE_SIZE - start);
-			buf.vmap_ptr = (void*)((char*)p + i * PAGE_SIZE);
+			buf.vmap_ptr = p + i * PAGE_SIZE;
 			add_to_alias_rmap(pages[i], p + i * PAGE_SIZE); 
 			buf.page = pages[i];
 			buf.offset = start;
