@@ -131,7 +131,7 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 	// put_page(buf->page);
 	// //alias_page_close(buf_page);
 	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
-	put_page(buf->page);
+	put_page(page);
 	buf->flags &= ~PIPE_BUF_FLAG_LRU;
 }
 
