@@ -135,7 +135,7 @@ void add_to_alias_rmap(struct page* page, void* ptr){
 	page_ext_put(page_ext);
 }
 
-int is_rmap_empty(struct page* page){
+int is_alias_rmap_empty(struct page* page){
 	//returns 0 if empty, else 1
 	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
