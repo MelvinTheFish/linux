@@ -24,8 +24,8 @@
  *	@private: private data owned by the ops.
  **/
 struct pipe_buffer {
-	struct page_alias *page_alias;
-	struct page *page;
+	void *vmap_ptr;
+	//struct page *page;
 	unsigned int offset, len;
 	const struct pipe_buf_operations *ops;
 	unsigned int flags;
