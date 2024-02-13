@@ -13,6 +13,10 @@
 #include <linux/page_alias.h>
 
 #include "internal.h"
+struct rmap_alias{
+        struct rmap_alias* next;
+        void* curr;
+};
 
 struct page_alias{
         int do_not_move: 1;
@@ -20,10 +24,7 @@ struct page_alias{
         struct rmap_alias rmap_list;
 };
 
-struct rmap_alias{
-        struct rmap_alias* next;
-        void* curr;
-};
+
 
 static inline struct page_alias* get_page_alias(struct page_ext *page_ext) 
 { 
