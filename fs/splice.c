@@ -120,8 +120,10 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 	
 	//struct page* buf_page = 
 	printk(KERN_INFO "OAN: %d", is_vmalloc_addr(buf->vmap_ptr));
+	struct page_struct * page = vmalloc_to_page(p);
 	//printk(KERN_INFO "func1, addr 1: %p", buf_page);
-	printk(KERN_INFO "func2, addr 2: %p", buf->page);
+	printk(KERN_INFO "OAN, addr 2: %p", buf->page);
+	printk(KERN_INFO "OAN: %d", (buf->page == page));
 	// put_page(buf->page);
 	// //alias_page_close(buf_page);
 	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
