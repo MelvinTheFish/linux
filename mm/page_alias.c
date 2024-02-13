@@ -54,8 +54,8 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
         page_alias = get_page_alias(page_ext);
         page_alias->do_not_move = 1;
         refcount_set(&page_alias->ref_count, 1);
-        page_alias->rmap_list->next = null;
-        page_alias->rmap_list->curr = null;
+        page_alias->rmap_list->next = NULL;
+        page_alias->rmap_list->curr = NULL;
 }
 
 noinline void __set_page_alias(struct page *page)
