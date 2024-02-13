@@ -1424,7 +1424,7 @@ static int iter_to_pipe(struct iov_iter *from,
 		
 		for (i = 0; i < n; i++) {
 			int size = min_t(int, left, PAGE_SIZE - start);
-			buf.vmap_ptr = &p[i];
+			buf.vmap_ptr = (void*)((char*)p + i * PAGE_SIZE);
 			add_to_alias_rmap(pages[i], p + i * PAGE_SIZE); 
 			buf.page = pages[i];
 			buf.offset = start;
