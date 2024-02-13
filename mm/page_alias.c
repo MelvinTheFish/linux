@@ -22,13 +22,13 @@ struct page_alias{
 
 struct rmap_alias{
         struct rmap_alias* next;
-        void* current;
+        void* curr;
 };
 
-static struct page_alias* get_page_alias(struct page *page) 
+static struct page_alias* get_page_alias(struct page_ext *page_ext) 
 { 
         struct page_alias *page_alias;
-        page_alias = page_ext_data(page_ext_get(page), &page_alias_ops);
+        page_alias = page_ext_data(page_ext, &page_alias_ops);
         return page_alias;
 } 
 
@@ -39,7 +39,7 @@ static __init bool need_page_alias(void)
 
 static __init void init_page_alias(void)
 {
-        printk(KERN_ERR "just one init will be enough");
+        printk(KERN_INFO "just one init will be enough");
 }
 
 struct page_ext_operations page_alias_ops = {
@@ -47,3 +47,21 @@ struct page_ext_operations page_alias_ops = {
         .need = need_page_alias,
         .init = init_page_alias,
 };
+
+static inline void __set_page_ext_alias(struct page_ext *page_ext)
+{
+	struct page_alias *page_alias;
+        page_alias = get_page_alias(page_ext);
+        page_alias->do_not_move = 1;
+        refcount_set(page_alias->ref_count, 1);
+        page_alias->rmap_list->next = null;
+        page_alias->rmap_list->curr = null;
+}
+
+noinline void __set_page_alias(struct page *page)
+{
+	struct page_ext *page_ext;
+	page_ext = page_ext_get(page); //lock
+	__set_page_ext_alias(page_ext);
+	page_ext_put(page_ext); //unlock
+}
