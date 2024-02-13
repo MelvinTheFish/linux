@@ -4,13 +4,13 @@
 #include <linux/jump_label.h>
 
 #ifdef CONFIG_PAGE_ALIAS
-extern void __create_page_alias(struct page *page);
+extern void __set_page_alias(struct page *page);
 extern struct page_ext_operations page_alias_ops;
 static struct page_alias* get_page_alias(struct page *page);
 
-static inline void create_page_alias(struct page *page)
+static inline void set_page_alias(struct page *page)
 {
-        __create_page_alias(page);
+        __set_page_alias(page);
 }
 
 #endif
