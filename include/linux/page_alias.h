@@ -10,6 +10,7 @@ struct page* alias_vmap_to_page(void *p);
 void* alias_vmap(struct page **pages, int n);
 void alias_vunmap(void* p);
 void alias_page_close(struct page* page);
+void add_to_alias_rmap(struct page* page, void* ptr);
 
 static inline void set_page_alias(struct page *page)
 {
