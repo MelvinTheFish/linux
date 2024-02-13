@@ -123,6 +123,10 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 	struct page* page = vmalloc_to_page(buf->vmap_ptr);
 	//printk(KERN_INFO "func1, addr 1: %p", buf_page);
 	printk(KERN_INFO "OAN: is them eq: %d", ((void *)buf->page == (void *)page));
+	printk(KERN_INFO "OAN: sn: %d", page == NULL);
+	printk(KERN_INFO "OAN: sn: %d", buf->page == NULL);
+	printk(KERN_INFO "OAN: sn: %d", buf->vmap_ptr == NULL);
+
 	// put_page(buf->page);
 	// //alias_page_close(buf_page);
 	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
@@ -1432,6 +1436,7 @@ static int iter_to_pipe(struct iov_iter *from,
 			buf.vmap_ptr = p + i * PAGE_SIZE;
 			add_to_alias_rmap(pages[i], p + i * PAGE_SIZE); 
 			buf.page = pages[i];
+			printk(KERN_INFO "NIZAN: write after init %d", (void*)(vmalloc_to_page(buf.vmap_ptr)) == (void*)buf.page);
 			buf.offset = start;
 			buf.len = size;
 			ret = add_to_pipe(pipe, &buf);
