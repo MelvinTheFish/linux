@@ -60,8 +60,9 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
 
 noinline void __set_page_alias(struct page *page)
 {
+	//printk(KERN_ERR "omer and nizan: in set page_alias");
 	struct page_ext *page_ext;
 	page_ext = page_ext_get(page); //lock
-	__set_page_ext_alias(page_ext);
+	// __set_page_ext_alias(page_ext);
 	page_ext_put(page_ext); //unlock
 }
