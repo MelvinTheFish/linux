@@ -15,8 +15,22 @@
 #include "internal.h"
 
 struct page_alias{
-        int number;
+        int do_not_move: 1;
+        refcount_t ref_count;
+        struct rmap_alias* rmap_list;
 };
+
+struct rmap_alias{
+        struct rmap_alias* next;
+        void* current;
+};
+
+static struct page_alias* get_page_alias(struct page *page) 
+{ 
+        struct page_alias *page_alias;
+        page_alias = page_ext_data(page_ext_get(page), &page_alias_ops);
+        return page_alias;
+} 
 
 static __init bool need_page_alias(void)
 {
