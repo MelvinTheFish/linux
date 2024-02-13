@@ -118,7 +118,7 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 					struct pipe_buffer *buf)
 {
 	printk(KERN_INFO "func1");
-	struct page* buf_page = alias_vmap_to_page(buf->vmap_ptr)
+	struct page* buf_page = alias_vmap_to_page(buf->vmap_ptr);
 	put_page(buf_page);
 	alias_page_close(buf_page);
 	buf->flags &= ~PIPE_BUF_FLAG_LRU;
