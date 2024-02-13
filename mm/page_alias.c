@@ -105,12 +105,14 @@ void alias_vunmap(void* p){
 }
 
 struct page* alias_vmap_to_page(void *p){
-	struct page* page = vmalloc_to_page(p);
+	struct page* page;
 	
-	struct page_ext* page_ext = page_ext_get(page); 
-	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-        page_alias->do_not_move = 1;
-	page_ext_put(page_ext);
+		//page = vmalloc_to_page(p);
+	printk(KERN_INFO "OAN: %d", is_vmalloc_addr(cpu_addr));
+	// struct page_ext* page_ext = page_ext_get(page); 
+	// struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
+ //        page_alias->do_not_move = 1;
+	// page_ext_put(page_ext);
 	return page;
 }
 
