@@ -1424,7 +1424,7 @@ static int iter_to_pipe(struct iov_iter *from,
 		
 		n = DIV_ROUND_UP(left + start, PAGE_SIZE);
 		p = alias_vmap(pages, n);
-		printk("NIZAN: eq %d", (void*)vmalloc_to_page(p) == (void*)pages[0]);
+		printk(KERN_INFO "NIZAN: eq %d", (void*)vmalloc_to_page(p) == (void*)pages[0]);
 		
 		for (i = 0; i < n; i++) {
 			int size = min_t(int, left, PAGE_SIZE - start);
