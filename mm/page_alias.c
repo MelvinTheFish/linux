@@ -126,6 +126,16 @@ void alias_page_close(struct page* page)
 }
 
 
+// need to add support for list, now for one
+void add_to_alias_rmap(struct page* page, void* ptr){
+	struct page_ext* page_ext = page_ext_get(page); 
+	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
+        struct rmap_alias r = page_alias->rmap_list;
+	r.curr = ptr;
+	page_ext_put(page_ext);
+}
+
+
 
 
 
