@@ -55,6 +55,8 @@
 
 #include <trace/events/migrate.h>
 
+#include <linux/page_alias.h>
+
 #include "internal.h"
 
 bool isolate_movable_page(struct page *page, isolate_mode_t mode)
@@ -1886,6 +1888,7 @@ int migrate_pages(struct list_head *from, new_folio_t get_new_folio,
 		free_folio_t put_new_folio, unsigned long private,
 		enum migrate_mode mode, int reason, unsigned int *ret_succeeded)
 {
+	check_migration_at_start(from);
 	int rc, rc_gather;
 	int nr_pages;
 	struct folio *folio, *folio2;
