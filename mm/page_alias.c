@@ -108,7 +108,7 @@ void alias_vunmap(void* p){
 struct page* alias_vmap_to_page(void *p){
 	struct page* page = vmalloc_to_page(p);
 	
-	page_ext = page_ext_get(page); 
+	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
         page_alias->do_not_move = 1;
 	page_ext_put(page_ext);
@@ -117,7 +117,7 @@ struct page* alias_vmap_to_page(void *p){
 
 void alias_page_close(struct page* page)
 {
-	page_ext = page_ext_get(page); 
+	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
         page_alias->do_not_move = 0;
 	page_ext_put(page_ext);
