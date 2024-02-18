@@ -2080,7 +2080,13 @@ static int add_page_for_migration(struct mm_struct *mm, const void __user *p,
 
 	/* FOLL_DUMP to ignore special (like zero) pages */
 	page = follow_page(vma, addr, FOLL_GET | FOLL_DUMP);
+	printk(KERN_INFO "Omer and Nizan: in add_page_for_migration, after follow page");
+	if(is_alias_rmap_empty(page) == 0)
+		printk(KERN_INFO "Page: %d's rmap is empty (OI LI! :0) ", cnt);
+	else
+		printk(KERN_INFO "Page: %d's rmap is not empty (OH YES :)", cnt);
 
+	
 	err = PTR_ERR(page);
 	if (IS_ERR(page))
 		goto out;
