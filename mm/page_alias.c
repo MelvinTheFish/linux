@@ -149,24 +149,24 @@ int is_alias_rmap_empty(struct page* page){
 
 void check_migration_at_start(struct list_head *from){
 	// Iterate over each entry in the page list and print if it's rmap is empty
-	struct folio* folio;
-	struct page* page;
-	int cnt = 1;
-	printk(KERN_INFO "Omer and Nizan: In check_migration_at_start, starting to iterate");
-    	list_for_each_entry(folio, from, lru) {
-		page = &folio->page;
-		if (!page)
-		{
-			printk(KERN_INFO "Omer and Nizan: Folio: %d's page is null", cnt);
-		}else{
-			if(is_alias_rmap_empty(page) == 0)
-				printk(KERN_INFO "Page: %d's rmap is empty (OI LI! :0) ", cnt);
-			else
-				printk(KERN_INFO "Page: %d's rmap is not empty (OH YES :)", cnt);
-			cnt++;
-		}	
-	}
-	printk(KERN_INFO "Omer and Nizan: In check_migration_at_start, finished to iterate");
+	// struct folio* folio;
+	// struct page* page;
+	// int cnt = 1;
+	// printk(KERN_INFO "Omer and Nizan: In check_migration_at_start, starting to iterate");
+ //    	list_for_each_entry(folio, from, lru) {
+	// 	page = &folio->page;
+	// 	if (!page)
+	// 	{
+	// 		printk(KERN_INFO "Omer and Nizan: Folio: %d's page is null", cnt);
+	// 	}else{
+	// 		if(is_alias_rmap_empty(page) == 0)
+	// 			printk(KERN_INFO "Page: %d's rmap is empty (OI LI! :0) ", cnt);
+	// 		else
+	// 			printk(KERN_INFO "Page: %d's rmap is not empty (OH YES :)", cnt);
+	// 		cnt++;
+	// 	}	
+	// }
+	// printk(KERN_INFO "Omer and Nizan: In check_migration_at_start, finished to iterate");
 }
 
 
