@@ -2062,8 +2062,8 @@ static int do_move_pages_to_node(struct mm_struct *mm,
 static int add_page_for_migration(struct mm_struct *mm, const void __user *p,
 		int node, struct list_head *pagelist, bool migrate_all)
 {
-	printk(KERN_INFO "OMER AND NIZAN:  in add_page_for_migration");
-
+	printk(KERN_INFO "OMER AND NIZAN:  in add_page_for_migration, doing hook");
+	check_migration_at_start(pagelist);
 	struct vm_area_struct *vma;
 	unsigned long addr;
 	struct page *page;
