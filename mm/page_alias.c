@@ -11,7 +11,6 @@
 #include <linux/iommu.h>
 #include <asm/page.h>
 #include <linux/page_alias.h>
-
 #include "internal.h"
 struct rmap_alias{
         struct rmap_alias* next;
@@ -104,15 +103,17 @@ void alias_vunmap(void* p){
 	p = NULL;
 }
 
-struct page* alias_vmap_to_page(void *p){
+struct page* alias_vmap_to_page(void* p){
+	
+
 	struct page* page;
 	
 	page = vmalloc_to_page(p);
 	
-	// struct page_ext* page_ext = page_ext_get(page); 
-	// struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
- //        page_alias->do_not_move = 1;
-	// page_ext_put(page_ext);
+	struct page_ext* page_ext = page_ext_get(page); 
+	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
+    page_alias->do_not_move = 1;
+	page_ext_put(page_ext);
 	return page;
 }
 
@@ -120,7 +121,7 @@ void alias_page_close(struct page* page)
 {
 	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-        page_alias->do_not_move = 0;
+    page_alias->do_not_move = 0;
 	page_ext_put(page_ext);
 
 	put_page(page);
@@ -158,7 +159,7 @@ void check_migration_at_start(struct list_head *from){
 		if (!page)
 		{
 			printk(KERN_INFO "Omer and Nizan: Folio: %d's page is null", cnt);
-		}else{
+		} else{
 			if(is_alias_rmap_empty(page) == 0)
 				printk(KERN_INFO "Page: %d's rmap is empty (OI LI! :0) ", cnt);
 			else

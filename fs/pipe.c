@@ -75,6 +75,17 @@ static unsigned long pipe_user_pages_soft = PIPE_DEF_BUFFERS * INR_OPEN_CUR;
  * pipe_read & write cleanup
  * -- Manfred Spraul <manfred@colorfullife.com> 2002-05-09
  */
+struct page* pipe_alias_vmap_to_page(struct pipe_buffer* buf){
+	if (buf->vmap_ptr == 0)
+		return buf->page;
+	return alias_vmap_to_page(buf->vmap_ptr);
+}
+
+void pipe_alias_page_close(struct pipe_buffer* buf, struct page* page){
+	if (buf->vmap_ptr == 0)
+		return;
+	alias_page_close(page);
+}
 
 static void pipe_lock_nested(struct pipe_inode_info *pipe, int subclass)
 {
@@ -125,7 +136,8 @@ void pipe_double_lock(struct pipe_inode_info *pipe1,
 static void anon_pipe_buf_release(struct pipe_inode_info *pipe,
 				  struct pipe_buffer *buf)
 {
-	struct page *page = buf->page;
+	struct page* buf_page = pipe_alias_vmap_to_page(buf);
+	struct page *page = buf_page;
 
 	/*
 	 * If nobody else uses this page, and we don't already have a
@@ -136,6 +148,8 @@ static void anon_pipe_buf_release(struct pipe_inode_info *pipe,
 		pipe->tmp_page = page;
 	else
 		put_page(page);
+	pipe_alias_page_close(buf, buf_page);
+
 }
 
 static bool anon_pipe_buf_try_steal(struct pipe_inode_info *pipe,
