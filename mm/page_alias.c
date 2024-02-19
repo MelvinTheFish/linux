@@ -11,7 +11,6 @@
 #include <linux/iommu.h>
 #include <asm/page.h>
 #include <linux/page_alias.h>
-
 #include "internal.h"
 struct rmap_alias{
         struct rmap_alias* next;
@@ -49,7 +48,7 @@ struct page_ext_operations page_alias_ops = {
 
 static inline void __set_page_ext_alias(struct page_ext *page_ext)
 {
-	struct page_alias *page_alias;
+	      struct page_alias *page_alias;
         page_alias = get_page_alias(page_ext);
         page_alias->do_not_move = 0;
         refcount_set(&page_alias->ref_count, 0);
@@ -69,28 +68,6 @@ noinline void __set_page_alias(struct page *page)
 	page_ext_put(page_ext); //unlock
 }
 
-// struct page_alias get_page_alias_from_page(struct page *page)
-// {
-// 	//printk(KERN_ERR "omer and nizan: in set page_alias");
-// 	struct page_ext *page_ext;
-// 	page_ext = page_ext_get(page); //lock
-// 	if (unlikely(!page_ext))
-// 		return;
-// 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-// 	page_ext_put(page_ext); //unlock
-// 	return *page_alias;
-// }
-
-// void set_page_alias_from_page(struct page *page, struct page_alias p_new)
-// {
-// 	//printk(KERN_ERR "omer and nizan: in set page_alias");
-// 	page_ext = page_ext_get(page); //lock
-// 	if (unlikely(!page_ext))
-// 		return;
-// 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-// 	page_alias
-// 	page_ext_put(page_ext); //unlock
-// }
 
 void* alias_vmap(struct page **pages, int n){
 	void* vmap_address = vmap(pages, n, VM_MAP, PAGE_KERNEL); 
@@ -99,19 +76,19 @@ void* alias_vmap(struct page **pages, int n){
 
 
 void alias_vunmap(void* p){
-	vunmap(p); 
+  vunmap(p); 
 	p = NULL;
 }
 
-struct page* alias_vmap_to_page(void *p){
+struct page* alias_vmap_to_page(void* p){
 	struct page* page;
 	
 	page = vmalloc_to_page(p);
 	
-	// struct page_ext* page_ext = page_ext_get(page); 
-	// struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
- //        page_alias->do_not_move = 1;
-	// page_ext_put(page_ext);
+	struct page_ext* page_ext = page_ext_get(page); 
+	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
+  page_alias->do_not_move = 1;
+	page_ext_put(page_ext);
 	return page;
 }
 
@@ -119,7 +96,7 @@ void alias_page_close(struct page* page)
 {
 	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-        page_alias->do_not_move = 0;
+  page_alias->do_not_move = 0;
 	page_ext_put(page_ext);
 
 	put_page(page);
@@ -130,7 +107,7 @@ void alias_page_close(struct page* page)
 void add_to_alias_rmap(struct page* page, void* ptr){
 	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-        page_alias->rmap_list.curr = ptr;
+  page_alias->rmap_list.curr = ptr;
 	page_ext_put(page_ext);
 }
 
@@ -165,6 +142,7 @@ void check_migration_at_start(struct list_head *from){
 	// 	}	
 	// }
 	// printk(KERN_INFO "Omer and Nizan: In check_migration_at_start, finished to iterate");
+
 }
 
 

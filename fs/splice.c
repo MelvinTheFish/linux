@@ -54,6 +54,18 @@
  * here if set to avoid blocking other users of this pipe if splice is
  * being done on it.
  */
+struct page* splice_alias_vmap_to_page(struct pipe_buffer* buf){
+	if (buf->vmap_ptr == 0)
+		return buf->page;
+	return alias_vmap_to_page(buf->vmap_ptr);
+}
+
+void splice_alias_page_close(struct pipe_buffer* buf, struct page* page){
+	if (buf->vmap_ptr == 0)
+		return;
+	alias_page_close(page);
+}
+
 static noinline void noinline pipe_clear_nowait(struct file *file)
 {
 	fmode_t fmode = READ_ONCE(file->f_mode);
@@ -73,7 +85,8 @@ static noinline void noinline pipe_clear_nowait(struct file *file)
 static bool page_cache_pipe_buf_try_steal(struct pipe_inode_info *pipe,
 		struct pipe_buffer *buf)
 {
-	struct folio *folio = page_folio(buf->page);
+	struct page* buf_page = splice_alias_vmap_to_page(buf);
+	struct folio *folio = page_folio(buf_page);
 	struct address_space *mapping;
 
 	folio_lock(folio);
@@ -101,9 +114,11 @@ static bool page_cache_pipe_buf_try_steal(struct pipe_inode_info *pipe,
 		 */
 		if (remove_mapping(mapping, folio)) {
 			buf->flags |= PIPE_BUF_FLAG_LRU;
+			splice_alias_page_close(buf, buf_page);
 			return true;
 		}
 	}
+	splice_alias_page_close(buf, buf_page);
 
 	/*
 	 * Raced with truncate or failed to remove folio from current
@@ -111,6 +126,7 @@ static bool page_cache_pipe_buf_try_steal(struct pipe_inode_info *pipe,
 	 */
 out_unlock:
 	folio_unlock(folio);
+	splice_alias_page_close(buf, buf_page);
 	return false;
 }
 
@@ -119,20 +135,30 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 {
 	
 	//struct page* buf_page = 
-	printk(KERN_INFO "OAN: is_vmalloc_addr %d", is_vmalloc_addr(buf->vmap_ptr));
-	struct page* page = vmalloc_to_page(buf->vmap_ptr);
+	//printk(KERN_INFO "OAN: is_vmalloc_addr %d", is_vmalloc_addr(buf->vmap_ptr));
 	//printk(KERN_INFO "func1, addr 1: %p", buf_page);
-	printk(KERN_INFO "OAN: check new %d", (void*)(vmalloc_to_page(buf->vmap_ptr)) == (void*)buf->page);
-	printk(KERN_INFO "OAN: is them eq: %d", ((void *)buf->page == (void *)page));
-	printk(KERN_INFO "OAN: sn: %d", page == NULL);
-	printk(KERN_INFO "OAN: sn: %d", buf->page == NULL);
-	printk(KERN_INFO "OAN: sn: %d", buf->vmap_ptr == NULL);
+	// printk(KERN_INFO "OAN: check new %d", (void*)(vmalloc_to_page(buf->vmap_ptr)) == (void*)buf->page);
+	// printk(KERN_INFO "OAN: is them eq: %d", ((void *)buf->page == (void *)page));
+	// printk(KERN_INFO "OAN: sn: %d", page == NULL);
+	// printk(KERN_INFO "OAN: sn: %d", buf->page == NULL);
+	// printk(KERN_INFO "OAN: sn: %d", buf->vmap_ptr == NULL);
 
 	// put_page(buf->page);
 	// //alias_page_close(buf_page);
 	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
-	put_page(page);
+
+	//OLD VERSION
+	// struct page* page = vmalloc_to_page(buf->vmap_ptr);
+	// put_page(page);
+	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
+
+	//NEW VERSION
+	struct page* buf_page = splice_alias_vmap_to_page(buf);
+	put_page(buf_page);
 	buf->flags &= ~PIPE_BUF_FLAG_LRU;
+	splice_alias_page_close(buf, buf_page);
+
+
 }
 
 /*
@@ -142,7 +168,8 @@ static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 static int page_cache_pipe_buf_confirm(struct pipe_inode_info *pipe,
 				       struct pipe_buffer *buf)
 {
-	struct folio *folio = page_folio(buf->page);
+	struct page* buf_page = splice_alias_vmap_to_page(buf);	
+	struct folio *folio = page_folio(buf_page);
 	int err;
 
 	if (!folio_test_uptodate(folio)) {
@@ -168,10 +195,12 @@ static int page_cache_pipe_buf_confirm(struct pipe_inode_info *pipe,
 		/* Folio is ok after all, we are done */
 		folio_unlock(folio);
 	}
-
+	splice_alias_page_close(buf, buf_page);
 	return 0;
+
 error:
 	folio_unlock(folio);
+	splice_alias_page_close(buf, buf_page);
 	return err;
 }
 
@@ -237,7 +266,7 @@ ssize_t splice_to_pipe(struct pipe_inode_info *pipe,
 
 	while (!pipe_full(head, tail, pipe->max_usage)) {
 		struct pipe_buffer *buf = &pipe->bufs[head & mask];
-
+		buf->vmap_ptr = 0;
 		buf->page = spd->pages[page_nr];
 		buf->offset = spd->partial[page_nr].offset;
 		buf->len = spd->partial[page_nr].len;
@@ -748,9 +777,10 @@ iter_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 					ret = 0;
 				goto done;
 			}
-
-			bvec_set_page(&array[n], buf->page, this_len,
+			struct page* buf_page = splice_alias_vmap_to_page(buf);	
+			bvec_set_page(&array[n], buf_page, this_len,
 				      buf->offset);
+			splice_alias_page_close(buf, buf_page);
 			left -= this_len;
 			n++;
 		}
@@ -880,8 +910,9 @@ ssize_t splice_to_socket(struct pipe_inode_info *pipe, struct file *out,
 					ret = 0;
 				break;
 			}
-
-			bvec_set_page(&bvec[bc++], buf->page, seg, buf->offset);
+			struct page* buf_page = splice_alias_vmap_to_page(buf);	
+			bvec_set_page(&bvec[bc++], buf_page, seg, buf->offset);
+			splice_alias_page_close(buf, buf_page);
 			remain -= seg;
 			if (remain == 0 || bc >= ARRAY_SIZE(bvec))
 				break;
@@ -1464,7 +1495,9 @@ out:
 static int pipe_to_user(struct pipe_inode_info *pipe, struct pipe_buffer *buf,
 			struct splice_desc *sd)
 {
-	int n = copy_page_to_iter(buf->page, buf->offset, sd->len, sd->u.data);
+	struct page* buf_page = splice_alias_vmap_to_page(buf);
+	int n = copy_page_to_iter(buf_page, buf->offset, sd->len, sd->u.data);
+	splice_alias_page_close(buf, buf_page);
 	return n == sd->len ? n : -EFAULT;
 }
 
