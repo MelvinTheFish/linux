@@ -54,6 +54,14 @@
  * here if set to avoid blocking other users of this pipe if splice is
  * being done on it.
  */
+
+void splice_close_page(struct pipe_buffer* buf){
+	if (buf->vmap_ptr == 0)
+		put_page(buf->page);	
+	// else
+	// 	alias_vunmap(buf->vmap_ptr);
+}
+
 struct page* splice_alias_vmap_to_page(struct pipe_buffer* buf){
 	if (buf->vmap_ptr == 0)
 		return buf->page;
@@ -133,32 +141,14 @@ out_unlock:
 static void page_cache_pipe_buf_release(struct pipe_inode_info *pipe,
 					struct pipe_buffer *buf)
 {
-	
-	//struct page* buf_page = 
-	//printk(KERN_INFO "OAN: is_vmalloc_addr %d", is_vmalloc_addr(buf->vmap_ptr));
-	//printk(KERN_INFO "func1, addr 1: %p", buf_page);
-	// printk(KERN_INFO "OAN: check new %d", (void*)(vmalloc_to_page(buf->vmap_ptr)) == (void*)buf->page);
-	// printk(KERN_INFO "OAN: is them eq: %d", ((void *)buf->page == (void *)page));
-	// printk(KERN_INFO "OAN: sn: %d", page == NULL);
-	// printk(KERN_INFO "OAN: sn: %d", buf->page == NULL);
-	// printk(KERN_INFO "OAN: sn: %d", buf->vmap_ptr == NULL);
-
-	// put_page(buf->page);
-	// //alias_page_close(buf_page);
-	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
+	//TODO: page = NULL
 
 	//OLD VERSION
-	// struct page* page = vmalloc_to_page(buf->vmap_ptr);
-	// put_page(page);
-	// buf->flags &= ~PIPE_BUF_FLAG_LRU;
+	// put_page(buf_page);
+	// splice_alias_page_close(buf, buf_page);
 
-	//NEW VERSION
-	struct page* buf_page = splice_alias_vmap_to_page(buf);
-	put_page(buf_page);
+	splice_close_page(buf);
 	buf->flags &= ~PIPE_BUF_FLAG_LRU;
-	splice_alias_page_close(buf, buf_page);
-
-
 }
 
 /*
@@ -718,6 +708,7 @@ ssize_t
 iter_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 			  loff_t *ppos, size_t len, unsigned int flags)
 {
+	pr_info("OMERRR");
 	struct splice_desc sd = {
 		.total_len = len,
 		.flags = flags,
@@ -777,10 +768,11 @@ iter_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 					ret = 0;
 				goto done;
 			}
-			struct page* buf_page = splice_alias_vmap_to_page(buf);	
-			bvec_set_page(&array[n], buf_page, this_len,
-				      buf->offset);
-			splice_alias_page_close(buf, buf_page);
+			/////////////
+
+			bvec_set_page(&array[n], buf->page, this_len, buf->offset);
+
+			/////////////
 			left -= this_len;
 			n++;
 		}
@@ -844,6 +836,7 @@ EXPORT_SYMBOL(iter_file_splice_write);
 ssize_t splice_to_socket(struct pipe_inode_info *pipe, struct file *out,
 			 loff_t *ppos, size_t len, unsigned int flags)
 {
+	pr_info("OMERRR?");
 	struct socket *sock = sock_from_file(out);
 	struct bio_vec bvec[16];
 	struct msghdr msg = {};
@@ -910,9 +903,9 @@ ssize_t splice_to_socket(struct pipe_inode_info *pipe, struct file *out,
 					ret = 0;
 				break;
 			}
-			struct page* buf_page = splice_alias_vmap_to_page(buf);	
-			bvec_set_page(&bvec[bc++], buf_page, seg, buf->offset);
-			splice_alias_page_close(buf, buf_page);
+			//struct page* buf_page = splice_alias_vmap_to_page(buf);	
+			bvec_set_page(&bvec[bc++], buf->page, seg, buf->offset);
+			//splice_alias_page_close(buf, buf_page);
 			remain -= seg;
 			if (remain == 0 || bc >= ARRAY_SIZE(bvec))
 				break;
@@ -1458,18 +1451,18 @@ static int iter_to_pipe(struct iov_iter *from,
 
 		
 		n = DIV_ROUND_UP(left + start, PAGE_SIZE);
-		p = alias_vmap(pages, n);
 		// printk(KERN_INFO "NIZAN: eq[0] %d", (void*)vmalloc_to_page(p) == (void*)pages[0]);
 		// printk(KERN_INFO "NIZAN: eq[1] %d", ((void*)vmalloc_to_page(p + 1)) == (void*)pages[1]);
 		// printk(KERN_INFO "NIZAN: eq[1] %d", (void*)(vmalloc_to_page(p + PAGE_SIZE)) == (void*)pages[1]);
 
 		for (i = 0; i < n; i++) {
+			p = alias_vmap(&pages[i], 1);
 			int size = min_t(int, left, PAGE_SIZE - start);
-			buf.vmap_ptr = p + i * PAGE_SIZE;
-			add_to_alias_rmap(pages[i], p + i * PAGE_SIZE); 
-			buf.page = pages[i];
+			buf.vmap_ptr = p;
+			add_to_alias_rmap(pages[i], buf.vmap_ptr); 
+			buf.page = NULL;
 			printk(KERN_INFO "NIZAN: write after init %d", (void*)(vmalloc_to_page(buf.vmap_ptr)) == (void*)buf.page);
-			printk(KERN_INFO "NIZAN is_alias_rmap_empty AFTER init = %d", is_alias_rmap_empty(buf.page));
+			//printk(KERN_INFO "NIZAN is_alias_rmap_empty AFTER init = %d", is_alias_rmap_empty(buf.page));
 			buf.offset = start;
 			buf.len = size;
 			ret = add_to_pipe(pipe, &buf);
@@ -1495,9 +1488,10 @@ out:
 static int pipe_to_user(struct pipe_inode_info *pipe, struct pipe_buffer *buf,
 			struct splice_desc *sd)
 {
-	struct page* buf_page = splice_alias_vmap_to_page(buf);
-	int n = copy_page_to_iter(buf_page, buf->offset, sd->len, sd->u.data);
-	splice_alias_page_close(buf, buf_page);
+	// int n = copy_page_to_iter(alias_vmap_to_page(buf->vmap_ptr), buf->offset, sd->len, sd->u.data);
+	// return n == sd->len ? n : -EFAULT;
+
+	int n = copy_to_iter(buf->vmap_ptr + buf->offset, sd->len, sd->u.data);
 	return n == sd->len ? n : -EFAULT;
 }
 

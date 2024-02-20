@@ -26,7 +26,7 @@
 #include <linux/memcontrol.h>
 #include <linux/watch_queue.h>
 #include <linux/sysctl.h>
-
+#include <linux/page_alias.h>
 #include <linux/uaccess.h>
 #include <asm/ioctls.h>
 
@@ -244,6 +244,7 @@ static inline bool pipe_readable(const struct pipe_inode_info *pipe)
 static ssize_t
 pipe_read(struct kiocb *iocb, struct iov_iter *to)
 {
+	//printk(KERN_INFO "arrived pipe_read ??");
 	size_t total_len = iov_iter_count(to);
 	struct file *filp = iocb->ki_filp;
 	struct pipe_inode_info *pipe = filp->private_data;
@@ -317,8 +318,13 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 					ret = error;
 				break;
 			}
-
-			written = copy_page_to_iter(buf->page, buf->offset, chars, to);
+			printk(KERN_INFO "changed copy to iter");
+			if(buf->page)
+				written = copy_page_to_iter(buf->page, buf->offset, chars, to);
+			else{
+				written = copy_to_iter(buf->vmap_ptr + buf->offset, chars, to);
+				//written = copy_page_to_iter(alias_vmap_to_page(buf->vmap_ptr), buf->offset, chars, to);
+			}
 			if (unlikely(written < chars)) {
 				if (!ret)
 					ret = -EFAULT;
