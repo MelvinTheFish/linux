@@ -58,8 +58,8 @@
 void splice_close_page(struct pipe_buffer* buf){
 	if (buf->vmap_ptr == 0)
 		put_page(buf->page);	
-	// else
-	// 	alias_vunmap(buf->vmap_ptr);
+	else
+		alias_vunmap(buf->vmap_ptr);
 }
 
 struct page* splice_alias_vmap_to_page(struct pipe_buffer* buf){
@@ -1470,7 +1470,8 @@ static int iter_to_pipe(struct iov_iter *from,
 				iov_iter_revert(from, left);
 				// this one got dropped by add_to_pipe()
 				while (++i < n)
-					put_page(pages[i]);
+					splice_close_page(&buf);
+					//put_page(pages[i]);
 				goto out;
 			}
 			total += ret;
