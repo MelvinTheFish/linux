@@ -387,7 +387,7 @@ static int folio_expected_refs(struct address_space *mapping,
 	refs += folio_nr_pages(folio);
 	if (folio_test_private(folio))
 		refs++;
-
+	//refs += is_alias_rmap_empty(folio_page(folio, 0));
 	return refs;
 }
 
@@ -400,7 +400,8 @@ static int folio_expected_refs(struct address_space *mapping,
  * 3 for pages with a mapping and PagePrivate/PagePrivate2 set.
  */
 int folio_migrate_mapping(struct address_space *mapping,
-		struct folio *newfolio, struct folio *folio, int extra_count)
+		struct folio *newfolio, struct folio *folio, int extra_count, 
+		pgoff_t *save_index, struct address_space *save_mapping)
 {
 	XA_STATE(xas, &mapping->i_pages, folio_index(folio));
 	struct zone *oldzone, *newzone;
@@ -410,11 +411,16 @@ int folio_migrate_mapping(struct address_space *mapping,
 
 	if (!mapping) {
 		/* Anonymous page without mapping */
-		if (folio_ref_count(folio) != expected_count)
+		if (folio_ref_count(folio) != expected_count){
+			pr_info("fuck2");
 			return -EAGAIN;
-
-		/* No turning back from here */
+		}
+		/* No turning back from here, until now. */
+		if(save_index)
+			save_index = &(newfolio->index);
 		newfolio->index = folio->index;
+		if(save_mapping)
+			save_mapping = newfolio->mapping;
 		newfolio->mapping = folio->mapping;
 		if (folio_test_swapbacked(folio))
 			__folio_set_swapbacked(newfolio);
@@ -640,10 +646,55 @@ void folio_migrate_flags(struct folio *newfolio, struct folio *folio)
 }
 EXPORT_SYMBOL(folio_migrate_flags);
 
-void folio_migrate_copy(struct folio *newfolio, struct folio *folio)
+void clean_folio_migrate_mapping(struct folio *newfolio, struct folio *folio, 
+									pgoff_t *save_index, struct address_space *save_mapping){
+	if (folio_test_swapbacked(folio))
+		__folio_clear_swapbacked(newfolio);
+	if (save_index)
+		newfolio->index = *save_index;
+	newfolio->mapping = save_mapping;
+	folio_put(newfolio); //?
+}
+
+void prepare_for_migrate_copy(struct folio *folio)
 {
+	struct page* page = folio_page(folio, 0);
+	if(is_alias_rmap_empty(page) == 0)
+		return;
+	void *vptr = get_alias_rmap(page);
+	pte_t *vpte = virt_to_kpte((unsigned long)vptr);
+	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
+	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *) &vpte->pte);
+}
+
+int check_after_migrate_copy(struct folio *newfolio, struct folio *folio)
+{
+	struct page* page = folio_page(folio, 0);
+	pr_info("omer is king are, %d", is_alias_rmap_empty(page));
+	if(is_alias_rmap_empty(page) == 0)
+		return -EAGAIN;
+	void *vptr = get_alias_rmap(page);
+	pte_t *vpte = virt_to_kpte((unsigned long)vptr);
+	pr_info("omer is king, %d", pte_young(*vpte));
+	if(pte_young(*vpte))
+		return -EAGAIN; 
+	alias_vunmap(vptr);
+	struct page* newpage = folio_page(newfolio, 0);
+	void *p = alias_vmap(&page, 1);
+	add_to_alias_rmap(newpage, p);
+	return -EAGAIN; 
+	//return MIGRATEPAGE_SUCCESS;
+}
+
+
+int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
+{
+	prepare_for_migrate_copy(folio);
 	folio_copy(newfolio, folio);
+	if (check_after_migrate_copy(newfolio, folio) != MIGRATEPAGE_SUCCESS)
+		return -EAGAIN; 
 	folio_migrate_flags(newfolio, folio);
+	return MIGRATEPAGE_SUCCESS;
 }
 EXPORT_SYMBOL(folio_migrate_copy);
 
@@ -657,16 +708,22 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 	int rc;
 
 	BUG_ON(folio_test_writeback(src));	/* Writeback must be complete */
-
-	rc = folio_migrate_mapping(mapping, dst, src, extra_count);
+	pgoff_t *save_index = NULL; 
+	struct address_space *save_mapping = NULL;
+	rc = folio_migrate_mapping(mapping, dst, src, extra_count, save_index, save_mapping);
 
 	if (rc != MIGRATEPAGE_SUCCESS)
 		return rc;
 
+	rc = MIGRATEPAGE_SUCCESS;
 	if (mode != MIGRATE_SYNC_NO_COPY)
-		folio_migrate_copy(dst, src);
+		rc = folio_migrate_copy(dst, src);
 	else
 		folio_migrate_flags(dst, src);
+	if(rc != MIGRATEPAGE_SUCCESS){
+		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
+		return rc;
+	}
 	return MIGRATEPAGE_SUCCESS;
 }
 
@@ -737,9 +794,10 @@ static int __buffer_migrate_folio(struct address_space *mapping,
 
 	/* Check whether page does not have extra refs before we do more work */
 	expected_count = folio_expected_refs(mapping, src);
-	if (folio_ref_count(src) != expected_count)
+	if (folio_ref_count(src) != expected_count){
+		pr_info("fuck1");
 		return -EAGAIN;
-
+	}
 	if (!buffer_migrate_lock_buffers(head, mode))
 		return -EAGAIN;
 
@@ -769,8 +827,9 @@ recheck_buffers:
 			goto recheck_buffers;
 		}
 	}
-
-	rc = folio_migrate_mapping(mapping, dst, src, 0);
+	pgoff_t *save_index = NULL; 
+	struct address_space *save_mapping = NULL;
+	rc = folio_migrate_mapping(mapping, dst, src, 0, save_index, save_mapping);
 	if (rc != MIGRATEPAGE_SUCCESS)
 		goto unlock_buffers;
 
@@ -782,12 +841,15 @@ recheck_buffers:
 		bh = bh->b_this_page;
 	} while (bh != head);
 
+	rc = MIGRATEPAGE_SUCCESS;
 	if (mode != MIGRATE_SYNC_NO_COPY)
-		folio_migrate_copy(dst, src);
+		rc = folio_migrate_copy(dst, src);
 	else
 		folio_migrate_flags(dst, src);
+	if (rc != MIGRATEPAGE_SUCCESS){
+		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
+	}
 
-	rc = MIGRATEPAGE_SUCCESS;
 unlock_buffers:
 	if (check_refs)
 		spin_unlock(&mapping->private_lock);
@@ -848,18 +910,24 @@ int filemap_migrate_folio(struct address_space *mapping,
 		struct folio *dst, struct folio *src, enum migrate_mode mode)
 {
 	int ret;
-
-	ret = folio_migrate_mapping(mapping, dst, src, 0);
+	pgoff_t *save_index = NULL; 
+	struct address_space *save_mapping = NULL;
+	ret = folio_migrate_mapping(mapping, dst, src, 0, save_index, save_mapping);
 	if (ret != MIGRATEPAGE_SUCCESS)
 		return ret;
 
 	if (folio_get_private(src))
 		folio_attach_private(dst, folio_detach_private(src));
 
+	ret = MIGRATEPAGE_SUCCESS;
 	if (mode != MIGRATE_SYNC_NO_COPY)
-		folio_migrate_copy(dst, src);
+		ret = folio_migrate_copy(dst, src);
 	else
 		folio_migrate_flags(dst, src);
+	if(ret != MIGRATEPAGE_SUCCESS){
+		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
+		return ret;
+	}
 	return MIGRATEPAGE_SUCCESS;
 }
 EXPORT_SYMBOL_GPL(filemap_migrate_folio);
@@ -2086,14 +2154,19 @@ static int add_page_for_migration(struct mm_struct *mm, const void __user *p,
 	else
 		printk(KERN_INFO "Page's rmap is not empty (OH YES :)");
 
-	
+	pr_info("here1");
+
 	err = PTR_ERR(page);
 	if (IS_ERR(page))
 		goto out;
 
+	pr_info("here2");
+
 	err = -ENOENT;
 	if (!page)
 		goto out;
+
+	pr_info("here3");
 
 	if (is_zone_device_page(page))
 		goto out_putpage;

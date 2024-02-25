@@ -139,7 +139,7 @@ static void anon_pipe_buf_release(struct pipe_inode_info *pipe,
 				  struct pipe_buffer *buf)
 {
 	//struct page* buf_page = pipe_alias_vmap_to_page(buf);
-	printk(KERN_INFO "in apbr");
+	//printk(KERN_INFO "in apbr");
 	struct page *page = buf->page;
 
 	/*
@@ -322,7 +322,7 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 					ret = error;
 				break;
 			}
-			printk(KERN_INFO "changed copy to iter");
+			//printk(KERN_INFO "changed copy to iter");
 			if(buf->page)
 				written = copy_page_to_iter(buf->page, buf->offset, chars, to);
 			else{

@@ -116,7 +116,7 @@ int is_alias_rmap_empty(struct page* page){
 	//returns 0 if empty, else 1
 	struct page_ext* page_ext = page_ext_get(page); 
 	struct page_alias* page_alias = page_ext_data(page_ext, &page_alias_ops);
-        //struct rmap_alias r = page_alias->rmap_list;
+    //struct rmap_alias r = page_alias->rmap_list;
 	int i = (page_alias->rmap_list.curr ? 1 : 0);
 	page_ext_put(page_ext);
 	return i;
