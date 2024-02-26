@@ -59,6 +59,15 @@
 
 #include "internal.h"
 
+#define DAUBE_DBG 0 // Change this to 0 to disable debugging
+
+// Conditional Debugging Macro
+#if DAUBE_DBG
+#define makpitz_dbg(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define makpitz_dbg(fmt, ...)
+#endif
+
 bool isolate_movable_page(struct page *page, isolate_mode_t mode)
 {
 	struct folio *folio = folio_get_nontail_page(page);
@@ -419,7 +428,7 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
 		if (count != expected_count) {
-			// pr_info("ref count is wrong. expected: %d, got: %d\n",
+			// makpitz_dbg("ref count is wrong. expected: %d, got: %d\n",
 			// 	expected_count, count);
 			return -EAGAIN;
 		}
@@ -663,10 +672,15 @@ void clean_folio_migrate_mapping(struct folio *newfolio, struct folio *folio,
 				 pgoff_t *save_index,
 				 struct address_space *save_mapping)
 {
+	makpitz_dbg("In clean_folio_migrate_mapping.\n");
+	//TODO: do save_swapbacked instead maybe...
+	makpitz_dbg("restoring swapbacked\n");
 	if (folio_test_swapbacked(folio))
 		__folio_clear_swapbacked(newfolio);
+	makpitz_dbg("restoring index\n");
 	if (save_index)
 		newfolio->index = *save_index;
+	makpitz_dbg("restoring mapping\n");
 	newfolio->mapping = save_mapping;
 	folio_put(newfolio); //?
 }
@@ -690,7 +704,7 @@ pte_t prepare_for_migrate_copy(struct folio *folio)
 int check_after_migrate_copy(struct folio *newfolio, struct folio *folio,
 			     pte_t old_pte)
 {
-	pr_info("In check_after_migrate_copy\n");
+	makpitz_dbg("In check_after_migrate_copy\n");
 	struct page *curr_page;
 	void *vptr;
 	pte_t *curr_pte, new_pte;
@@ -701,14 +715,17 @@ int check_after_migrate_copy(struct folio *newfolio, struct folio *folio,
 	vptr = get_alias_rmap(
 		curr_page); //need later to make sure we do that to all references and not just one.
 	curr_pte = virt_to_kpte((unsigned long)vptr);
-	pr_info("current pte's access bit: %d\n", pte_young(*curr_pte));
+	makpitz_dbg("current pte's access bit: %d\n", pte_young(*curr_pte));
 	new_pte = mk_pte(folio_page(newfolio, 0), pte_pgprot(old_pte));
 	//No pfn. wrong?
+
+	return -EBUSY; //just to make all pin migrations fail
+
 	if (!try_cmpxchg(curr_pte, &old_pte, new_pte)) {
-		pr_info("pinmig failed, old and current pte differ.\n");
+		makpitz_dbg("pinmig failed, old and current pte differ.\n");
 		return -EAGAIN;
 	}
-	pr_info("made pinmig!\n");
+	makpitz_dbg("made pinmig!\n");
 	return MIGRATEPAGE_SUCCESS;
 }
 
@@ -720,15 +737,15 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 
 	pinned = (is_alias_rmap_empty(page) == 1);
 	if (pinned)
-		pr_info("handling a pinned page\n");
+		makpitz_dbg("handling a pinned page\n");
 	else
-		pr_info("handling a non-pinned page\n");
+		makpitz_dbg("handling a non-pinned page\n");
 	if (pinned)
 		old_pte = prepare_for_migrate_copy(folio);
 	folio_copy(newfolio, folio);
 	if (pinned && check_after_migrate_copy(newfolio, folio, old_pte) !=
 			      MIGRATEPAGE_SUCCESS)
-		return -EAGAIN;
+		return -EBUSY;
 	folio_migrate_flags(newfolio, folio);
 	return MIGRATEPAGE_SUCCESS;
 }
@@ -759,6 +776,8 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 	else
 		folio_migrate_flags(dst, src);
 	if (rc != MIGRATEPAGE_SUCCESS) {
+		makpitz_dbg(
+			"in migrate_folio_extra, calling clean_folio_migrate_mapping.\n");
 		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
 		return rc;
 	}
@@ -780,6 +799,7 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 int migrate_folio(struct address_space *mapping, struct folio *dst,
 		  struct folio *src, enum migrate_mode mode)
 {
+	makpitz_dbg("in migrate_folio, calling migrate_folio_extra.\n");
 	return migrate_folio_extra(mapping, dst, src, mode, 0);
 }
 EXPORT_SYMBOL(migrate_folio);
@@ -827,8 +847,11 @@ static int __buffer_migrate_folio(struct address_space *mapping,
 	int expected_count;
 
 	head = folio_buffers(src);
-	if (!head)
+	if (!head) {
+		makpitz_dbg(
+			"in __buffer_migrate_folio, calling migrate_folio.\n");
 		return migrate_folio(mapping, dst, src, mode);
+	}
 
 	/* Check whether page does not have extra refs before we do more work */
 	expected_count = folio_expected_refs(mapping, src);
@@ -885,6 +908,8 @@ recheck_buffers:
 	else
 		folio_migrate_flags(dst, src);
 	if (rc != MIGRATEPAGE_SUCCESS) {
+		makpitz_dbg(
+			"in __buffer_migrate_folio, calling clean_folio_migrate_mapping.\n");
 		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
 	}
 
@@ -965,6 +990,8 @@ int filemap_migrate_folio(struct address_space *mapping, struct folio *dst,
 	else
 		folio_migrate_flags(dst, src);
 	if (ret != MIGRATEPAGE_SUCCESS) {
+		makpitz_dbg(
+			"in filemap_migrate_folio, calling clean_folio_migrate_mapping.\n");
 		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
 		return ret;
 	}
@@ -1036,7 +1063,7 @@ static int fallback_migrate_folio(struct address_space *mapping,
 	 */
 	if (!filemap_release_folio(src, GFP_KERNEL))
 		return mode == MIGRATE_SYNC ? -EAGAIN : -EBUSY;
-
+	makpitz_dbg("in fallback_migrate_folio, calling migrate_folio.\n");
 	return migrate_folio(mapping, dst, src, mode);
 }
 
@@ -1063,9 +1090,11 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 	if (likely(is_lru)) {
 		struct address_space *mapping = folio_mapping(src);
 
-		if (!mapping)
+		if (!mapping) {
+			makpitz_dbg(
+				"in move_to_new_folio, calling migrate_folio.\n");
 			rc = migrate_folio(mapping, dst, src, mode);
-		else if (mapping->a_ops->migrate_folio)
+		} else if (mapping->a_ops->migrate_folio) {
 			/*
 			 * Most folios have a mapping and most filesystems
 			 * provide a migrate_folio callback. Anonymous folios
@@ -1073,10 +1102,15 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 			 * migrate_folio callback. This is the most common path
 			 * for page migration.
 			 */
+			makpitz_dbg(
+				"in move_to_new_folio, calling migrate_folio.\n");
 			rc = mapping->a_ops->migrate_folio(mapping, dst, src,
 							   mode);
-		else
+		} else {
+			makpitz_dbg(
+				"in move_to_ne_folio, calling fallback_migrate_folio\n");
 			rc = fallback_migrate_folio(mapping, dst, src, mode);
+		}
 	} else {
 		const struct movable_operations *mops;
 
@@ -1382,6 +1416,7 @@ static int migrate_folio_move(free_folio_t put_new_folio, unsigned long private,
 	prev = dst->lru.prev;
 	list_del(&dst->lru);
 
+	makpitz_dbg("in migrate_folio_move, calling move_to_new_folio.\n");
 	rc = move_to_new_folio(dst, src, mode);
 	if (rc)
 		goto out;
@@ -1537,8 +1572,11 @@ static int unmap_and_move_huge_page(new_folio_t get_new_folio,
 			i_mmap_unlock_write(mapping);
 	}
 
-	if (!folio_mapped(src))
+	if (!folio_mapped(src)) {
+		makpitz_dbg(
+			"in unmap_and_move_huge_page, calling move_to_new_folio.\n");
 		rc = move_to_new_folio(dst, src, mode);
+	}
 
 	if (page_was_mapped)
 		remove_migration_ptes(
@@ -1726,6 +1764,7 @@ static int migrate_pages_batch(struct list_head *from,
 			       struct list_head *split_folios,
 			       struct migrate_pages_stats *stats, int nr_pass)
 {
+	makpitz_dbg("in migrate_pages_batch\n");
 	int retry = 1;
 	int thp_retry = 1;
 	int nr_failed = 0;
@@ -1876,7 +1915,8 @@ move:
 			nr_pages = folio_nr_pages(folio);
 
 			cond_resched();
-
+			makpitz_dbg(
+				"in migrate_pages_batch, calling migrate_folio_move\n");
 			rc = migrate_folio_move(put_new_folio, private, folio,
 						dst, mode, reason, ret_folios);
 			/*
@@ -1887,15 +1927,21 @@ move:
 			 */
 			switch (rc) {
 			case -EAGAIN:
+				makpitz_dbg(
+					"in migrate_pages_batch, got try again rc\n");
 				retry++;
 				thp_retry += is_thp;
 				nr_retry_pages += nr_pages;
 				break;
 			case MIGRATEPAGE_SUCCESS:
+				makpitz_dbg(
+					"in migrate_pages_batch, got success rc\n");
 				stats->nr_succeeded += nr_pages;
 				stats->nr_thp_succeeded += is_thp;
 				break;
 			default:
+				makpitz_dbg(
+					"in migrate_pages_batch, got defult rc\n");
 				nr_failed++;
 				stats->nr_thp_failed += is_thp;
 				stats->nr_failed_pages += nr_pages;
@@ -1943,6 +1989,7 @@ static int migrate_pages_sync(struct list_head *from, new_folio_t get_new_folio,
 
 	memset(&astats, 0, sizeof(astats));
 	/* Try to migrate in batch with MIGRATE_ASYNC mode firstly */
+	makpitz_dbg("in migrate_page_sync, calling migrate_pages_batch.\n");
 	rc = migrate_pages_batch(from, get_new_folio, put_new_folio, private,
 				 MIGRATE_ASYNC, reason, &folios, split_folios,
 				 &astats, NR_MAX_MIGRATE_ASYNC_RETRY);
@@ -1965,6 +2012,8 @@ static int migrate_pages_sync(struct list_head *from, new_folio_t get_new_folio,
 	list_splice_tail_init(&folios, from);
 	while (!list_empty(from)) {
 		list_move(from->next, &folios);
+		makpitz_dbg(
+			"in migrate_page_sync, calling migrate_pages_batch.\n");
 		rc = migrate_pages_batch(&folios, get_new_folio, put_new_folio,
 					 private, mode, reason, ret_folios,
 					 split_folios, stats,
@@ -2009,7 +2058,7 @@ int migrate_pages(struct list_head *from, new_folio_t get_new_folio,
 		  enum migrate_mode mode, int reason,
 		  unsigned int *ret_succeeded)
 {
-	pr_info("In migrate_pages.\n");
+	makpitz_dbg("In migrate_pages.\n");
 	check_migration_at_start(from);
 	int rc, rc_gather;
 	int nr_pages;
@@ -2046,12 +2095,13 @@ again:
 		list_cut_before(&folios, from, &folio2->lru);
 	else
 		list_splice_init(from, &folios);
-	if (mode == MIGRATE_ASYNC)
+	if (mode == MIGRATE_ASYNC) {
+		makpitz_dbg("in migrate_pages, calling migrate_pages_batch.\n");
 		rc = migrate_pages_batch(&folios, get_new_folio, put_new_folio,
 					 private, mode, reason, &ret_folios,
 					 &split_folios, &stats,
 					 NR_MAX_MIGRATE_PAGES_RETRY);
-	else
+	} else
 		rc = migrate_pages_sync(&folios, get_new_folio, put_new_folio,
 					private, mode, reason, &ret_folios,
 					&split_folios, &stats);
@@ -2067,6 +2117,7 @@ again:
 		 * is counted as 1 failure already.  And, we only try to migrate
 		 * with minimal effort, force MIGRATE_ASYNC mode and retry once.
 		 */
+		makpitz_dbg("in migrate_pages, calling migrate_pages_batch.\n");
 		migrate_pages_batch(&split_folios, get_new_folio, put_new_folio,
 				    private, MIGRATE_ASYNC, reason, &ret_folios,
 				    NULL, &stats, 1);
