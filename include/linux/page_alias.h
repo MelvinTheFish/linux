@@ -15,6 +15,7 @@ void check_migration_at_start(struct list_head *from);
 int is_alias_rmap_empty(struct page *page);
 void *get_alias_rmap(struct page *page);
 int get_alias_refcount(struct page *page); //need to be atomic in the future
+// void set_do_not_move(struct page *page, int i);
 
 static inline void set_page_alias(struct page *page)
 {

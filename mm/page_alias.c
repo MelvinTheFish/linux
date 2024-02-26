@@ -19,7 +19,7 @@ struct rmap_alias {
 };
 
 struct page_alias {
-	int do_not_move : 1;
+	atomic_t do_not_move;
 	refcount_t ref_count;
 	struct rmap_alias rmap_list;
 };
@@ -49,12 +49,24 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
 {
 	struct page_alias *page_alias;
 	page_alias = get_page_alias(page_ext);
-	page_alias->do_not_move = 0;
+	atomic_set(&page_alias->do_not_move, 0);
 	refcount_set(&page_alias->ref_count, 0);
 	//printk(KERN_ERR "omer and nizan: in set __set_page_ext_alias");
 	page_alias->rmap_list.curr = NULL;
 	page_alias->rmap_list.next = NULL;
 }
+
+// void set_do_not_move(struct page *page, int i)
+// {
+// 	struct page_ext *page_ext;
+// 	page_ext = page_ext_get(page); //lock
+// 	// if (unlikely(!page_ext))
+// 	// 	return;
+// 	struct page_alias *page_alias;
+// 	page_alias = get_page_alias(page_ext);
+// 	atomic_set(&page_alias->do_not_move, i);
+// 	page_ext_put(page_ext); //unlock
+// }
 
 noinline void __set_page_alias(struct page *page)
 {
@@ -88,7 +100,7 @@ struct page *alias_vmap_to_page(void *p)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	page_alias->do_not_move = 1;
+	atomic_set(&page_alias->do_not_move, 1);
 	page_ext_put(page_ext);
 	return page;
 }
@@ -98,7 +110,7 @@ void alias_page_close(struct page *page)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	page_alias->do_not_move = 0;
+	atomic_set(&page_alias->do_not_move, 0);
 	page_ext_put(page_ext);
 
 	put_page(page);
