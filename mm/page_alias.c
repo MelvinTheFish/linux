@@ -140,6 +140,7 @@ int get_alias_refcount(struct page *page)
 	int i = refcount_read(&(
 		page_alias->ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
 	page_ext_put(page_ext);
+	pr_info("refcount: %d", i);
 	return i;
 }
 
