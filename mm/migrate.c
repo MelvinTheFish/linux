@@ -12,7 +12,7 @@
  * Dave Hansen <haveblue@us.ibm.com>
  * Christoph Lameter
  */
-
+#include <linux/delay.h>
 #include <linux/migrate.h>
 #include <linux/export.h>
 #include <linux/swap.h>
@@ -398,6 +398,7 @@ static int folio_expected_refs(struct address_space *mapping,
 {
 	int refs = 1;
 	refs += get_alias_refcount(folio_page(folio, 0));//is this a race?
+
 	if (!mapping)
 		return refs;
 
@@ -425,13 +426,13 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 	int dirty;
 	int expected_count = folio_expected_refs(mapping, folio) + extra_count;
 	long nr = folio_nr_pages(folio);
-
+	makpitz_dbg("in folio_migrate_mapping");
 	if (!mapping) {
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
 		if (count != expected_count) {
-			// makpitz_dbg("ref count is wrong. expected: %d, got: %d\n",
-			// 	expected_count, count);
+			makpitz_dbg("ref count is wrong. expected: %d, got: %d\n",
+				expected_count, count);
 			return -EAGAIN;
 		}
 		/* No turning back from here, until now. */
@@ -695,8 +696,7 @@ pte_t prepare_for_migrate_copy(struct folio *folio)
 	pte_t *vpte = virt_to_kpte((unsigned long)vptr);
 	pte_t curr_pte;
 
-	flush_tlb_kernel_range((unsigned long)vptr,
-			       (unsigned long)vptr + PAGE_SIZE);
+	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
 	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&vpte->pte);
 	curr_pte = *vpte;
 	//in case between zeroing the real one and making the copy the access bit turned to 1 again
@@ -704,31 +704,35 @@ pte_t prepare_for_migrate_copy(struct folio *folio)
 	return curr_pte;
 }
 
-int check_after_migrate_copy(struct folio *newfolio, struct folio *folio,
-			     pte_t old_pte)
+int check_after_migrate_copy(struct folio *newfolio, struct folio *folio, pte_t old_pte)
 {
 	makpitz_dbg("In check_after_migrate_copy\n");
-	struct page *curr_page;
+	struct page *curr_page, *new_page;
 	void *vptr;
 	pte_t *curr_pte, new_pte;
 
 	curr_page = folio_page(folio, 0);
+	new_page = folio_page(newfolio, 0);
 	if (is_alias_rmap_empty(curr_page) == 0)
-		return -EAGAIN; //why?
-	vptr = get_alias_rmap(
-		curr_page); //need later to make sure we do that to all references and not just one.
+		return MIGRATEPAGE_SUCCESS; //why?
+	vptr = get_alias_rmap(curr_page); //need later to make sure we do that to all references and not just one.
 	curr_pte = virt_to_kpte((unsigned long)vptr);
 	makpitz_dbg("current pte's access bit: %d\n", pte_young(*curr_pte));
-	new_pte = mk_pte(folio_page(newfolio, 0), pte_pgprot(old_pte));
+	new_pte = mk_pte(new_page, pte_pgprot(old_pte));
+	folio_ref_add(newfolio, 1);
 	//No pfn. wrong?
 
-	return -EAGAIN; //should be EBUSY, now just to make all pin migrations fail
-
+	//return -EBUSY; //just to make all pin migrations fail
+	pr_info("started for");
+	msleep(1000);
+	pr_info("ended for");
 	if (!try_cmpxchg(curr_pte, &old_pte, new_pte)) {
 		makpitz_dbg("pinmig failed, old and current pte differ.\n");
-		return -EAGAIN;
+		return -EBUSY; // was -EAGAIN
 	}
 
+	__set_page_alias(new_page);
+	add_to_alias_rmap(new_page, vptr);
 	makpitz_dbg("made pinmig!\n");
 	return MIGRATEPAGE_SUCCESS;
 }
