@@ -689,7 +689,7 @@ void clean_folio_migrate_mapping(struct folio *newfolio, struct folio *folio,
 	folio_put(newfolio); //? delete put
 }
 
-pte_t prepare_for_migrate_copy(struct folio *folio)
+void kernel_migrate_pinned_page_prepare(struct folio *folio)
 {
 	struct page *page = folio_page(folio, 0);
 	void *vptr = get_alias_rmap(page);
@@ -697,35 +697,42 @@ pte_t prepare_for_migrate_copy(struct folio *folio)
 	pte_t curr_pte;
 
 	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
-	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&vpte->pte);
 	curr_pte = *vpte;
-	//in case between zeroing the real one and making the copy the access bit turned to 1 again
 	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&curr_pte.pte);
-	return curr_pte;
+	WRITE_ONCE(*vpte, curr_pte);
 }
 
-int check_after_migrate_copy(struct folio *newfolio, struct folio *folio, pte_t old_pte)
+int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *folio)
 {
 	makpitz_dbg("In check_after_migrate_copy\n");
 	struct page *curr_page, *new_page;
 	void *vptr;
-	pte_t *curr_pte, new_pte;
+	pte_t *curr_pte, new_pte, old_pte;
+	int young;
 
 	curr_page = folio_page(folio, 0);
 	new_page = folio_page(newfolio, 0);
 	if (is_alias_rmap_empty(curr_page) == 0)
-		return MIGRATEPAGE_SUCCESS; //why?
+		return MIGRATEPAGE_SUCCESS;
+	start_pinned_migration(curr_page);
 	vptr = get_alias_rmap(curr_page); //need later to make sure we do that to all references and not just one.
+	/*start iterating, later do:
+	if (!pte_present(old_pte)) 
+        return true; */
 	curr_pte = virt_to_kpte((unsigned long)vptr);
-	makpitz_dbg("current pte's access bit: %d\n", pte_young(*curr_pte));
+	old_pte = *curr_pte;
+	young = pte_young(*curr_pte);
+	makpitz_dbg("current pte's access bit: %d\n", young);
+	if (young)
+		return -EPINMIGF;
 	new_pte = mk_pte(new_page, pte_pgprot(old_pte));
 	folio_ref_add(newfolio, 1);
 	//No pfn. wrong?
 
 	//return -EBUSY; //just to make all pin migrations fail
-	pr_info("started for");
-	msleep(100);
-	pr_info("ended for");
+	// msleep(100);
+	
+
 	if (!try_cmpxchg(curr_pte, &old_pte, new_pte)) {
 		makpitz_dbg("pinmig failed, old and current pte differ.\n");
 		return -EPINMIGF; // was -EAGAIN
@@ -734,13 +741,14 @@ int check_after_migrate_copy(struct folio *newfolio, struct folio *folio, pte_t 
 	__set_page_alias(new_page);
 	add_to_alias_rmap(new_page, vptr);
 	makpitz_dbg("made pinmig!\n");
+	/* end iteration */
+	end_pinned_migration(curr_page);
 	return MIGRATEPAGE_SUCCESS;
 }
 
 int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
 	struct page *page = folio_page(folio, 0);
-	pte_t old_pte;
 	int pinned;
 
 	pinned = (is_alias_rmap_empty(page) == 1);
@@ -750,9 +758,9 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	else
 		makpitz_dbg("handling a non-pinned page\n");
 	if (pinned)
-		old_pte = prepare_for_migrate_copy(folio);
+		kernel_migrate_pinned_page_prepare(folio);
 	folio_copy(newfolio, folio);
-	if (pinned && check_after_migrate_copy(newfolio, folio, old_pte) != MIGRATEPAGE_SUCCESS)
+	if (pinned && kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
 		return -EPINMIGF;//should by Ebusy
 	folio_migrate_flags(newfolio, folio);
 	return MIGRATEPAGE_SUCCESS;

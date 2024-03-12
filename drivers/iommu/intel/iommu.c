@@ -301,6 +301,17 @@ static int iommu_skip_te_disable;
 
 const struct iommu_ops intel_iommu_ops;
 
+static bool intel_is_migration_supported(struct intel_iommu *iommu, struct dmar_domain *domain){
+	//also additionall chacks by nadav
+	if (!ecap_slads(iommu->ecap)){
+		return false;
+	}
+	return true;
+}
+
+
+
+
 static bool translation_pre_enabled(struct intel_iommu *iommu)
 {
 	return (iommu->flags & VTD_FLAG_TRANS_PRE_ENABLED);
@@ -2479,7 +2490,7 @@ static int dmar_domain_attach_device(struct dmar_domain *domain,
 			return ret;
 		}
 	}
-
+	domain->migration_supported = intel_is_migration_supported(iommu, domain);
 	ret = domain_context_mapping(domain, dev);
 	if (ret) {
 		dev_err(dev, "Domain context map failed\n");
@@ -3996,6 +4007,7 @@ static int md_domain_init(struct dmar_domain *domain, int guest_width)
 	domain->iommu_coherency = false;
 	domain->iommu_superpage = 0;
 	domain->max_addr = 0;
+	domain->migration_supported = false;
 
 	/* always allocate the top pgd */
 	domain->pgd = alloc_pgtable_page(domain->nid, GFP_ATOMIC);
@@ -4787,6 +4799,50 @@ static void *intel_iommu_hw_info(struct device *dev, u32 *length, u32 *type)
 	return vtd;
 }
 
+static int intel_migrate_page(struct iommu_domain *domain, unsigned long iova, bool prepare)
+{
+	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
+	struct iommu_domain_info *info;
+	unsigned long pfn = iova >> VTD_PAGE_SHIFT;
+	unsigned long i;
+	int level = 1;
+	struct dma_pte *ptep, pte, new_pte; 
+	bool dirty, young, first_level; 
+	ptep = pfn_to_dma_pte(dmar_domain, pfn, &level, GFP_ATOMIC);
+	if (level != 1)
+		return -EINVAL;
+	pte = READ_ONCE(*ptep);
+	if (!dma_pte_present(&pte))// || !dma_pte_write(&pte)) 
+		return 0;
+	if (!dmar_domain->migration_supported)
+		return -EINVAL;
+	first_level = dmar_domain->use_first_level;
+	dirty = dma_pte_dirty(&pte, first_level);
+	young = dma_pte_young(&pte, first_level);
+
+	if (prepare) {
+		/* Prepare the migration by clearing the access and dirty bits. */
+		if (dirty || young) {
+			new_pte = dma_pte_mkclean(pte, first_level);
+			new_pte = dma_pte_mkyoung(new_pte, first_level);
+			WRITE_ONCE(*ptep, new_pte);
+			xa_for_each(&dmar_domain->iommu_array, i, info)
+				iommu_flush_iotlb_psi(info->iommu, dmar_domain, pfn, 1, 0, 0);
+		}
+		return 0;
+	}
+
+	if (young || dirty)
+		return -EBUSY;
+
+	new_pte = pte;
+	new_pte.val &= ~VTD_PAGE_MASK;
+	new_pte.val |= pfn << VTD_PAGE_SHIFT;
+
+	/* If the access bit is clean we would not need a TLB flush */
+	return try_cmpxchg64(&ptep->val, &pte.val, new_pte.val);
+} 
+
 const struct iommu_ops intel_iommu_ops = {
 	.capable		= intel_iommu_capable,
 	.hw_info		= intel_iommu_hw_info,
@@ -4810,6 +4866,7 @@ const struct iommu_ops intel_iommu_ops = {
 		.set_dev_pasid		= intel_iommu_set_dev_pasid,
 		.map_pages		= intel_iommu_map_pages,
 		.unmap_pages		= intel_iommu_unmap_pages,
+		.migrate_page		= intel_migrate_page,
 		.iotlb_sync_map		= intel_iommu_iotlb_sync_map,
 		.flush_iotlb_all        = intel_flush_iotlb_all,
 		.iotlb_sync		= intel_iommu_tlb_sync,

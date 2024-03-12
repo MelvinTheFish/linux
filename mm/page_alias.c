@@ -16,6 +16,7 @@
 struct rmap_alias {
 	struct rmap_alias *next;
 	void *curr;
+	int type; //0 is kernel, 1 is iommu
 };
 
 struct page_alias {
@@ -54,23 +55,12 @@ static inline void __set_page_ext_alias(struct page_ext *page_ext)
 	//printk(KERN_ERR "omer and nizan: in set __set_page_ext_alias");
 	page_alias->rmap_list.curr = NULL;
 	page_alias->rmap_list.next = NULL;
+	page_alias->rmap_list.type = 0;
 }
 
-// void set_do_not_move(struct page *page, int i)
-// {
-// 	struct page_ext *page_ext;
-// 	page_ext = page_ext_get(page); //lock
-// 	// if (unlikely(!page_ext))
-// 	// 	return;
-// 	struct page_alias *page_alias;
-// 	page_alias = get_page_alias(page_ext);
-// 	atomic_set(&page_alias->do_not_move, i);
-// 	page_ext_put(page_ext); //unlock
-// }
 
 noinline void __set_page_alias(struct page *page)
 {
-	//printk(KERN_ERR "omer and nizan: in set page_alias");
 	struct page_ext *page_ext;
 	page_ext = page_ext_get(page); //lock
 	if (unlikely(!page_ext))
@@ -82,6 +72,7 @@ noinline void __set_page_alias(struct page *page)
 void *alias_vmap(struct page **pages, int n)
 {
 	void *vmap_address = vmap(pages, n, VM_MAP, PAGE_KERNEL);
+	add_to_alias_rmap(pages[0], vmap_address);
 	return vmap_address;
 }
 
@@ -94,13 +85,12 @@ void alias_vunmap(void *p)
 struct page *alias_vmap_to_page(void *p)
 {
 	struct page *page;
-
 	page = vmalloc_to_page(p);
-
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	atomic_set(&page_alias->do_not_move, 1);
+	while(atomic_cmpxchg(&page_alias->do_not_move, -1, -1));
+	atomic_inc(&page_alias->do_not_move);
 	page_ext_put(page_ext);
 	return page;
 }
@@ -110,9 +100,9 @@ void alias_page_close(struct page *page)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	atomic_set(&page_alias->do_not_move, 0);
+	BUG_ON(atomic_read(&page_alias->do_not_move) <= 0);
+	atomic_dec(&page_alias->do_not_move);
 	page_ext_put(page_ext);
-
 	put_page(page);
 }
 
@@ -122,6 +112,7 @@ void add_to_alias_rmap(struct page *page, void *ptr)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
+	
 	page_alias->rmap_list.curr = ptr;
 	int prev_count = refcount_read(&(page_alias->ref_count));
 	if (prev_count)
@@ -146,7 +137,7 @@ int get_alias_refcount(struct page *page)
 
 int is_alias_rmap_empty(struct page *page)
 {
-	//returns 0 if empty, else 1
+	/* returns 0 if empty, else 1 */
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
@@ -164,6 +155,26 @@ void *get_alias_rmap(struct page *page)
 	page_ext_put(page_ext);
 	return page_alias->rmap_list.curr;
 }
+
+int start_pinned_migration(struct page *page){
+	int ret;
+	struct page_ext *page_ext = page_ext_get(page);
+	struct page_alias *page_alias =
+		page_ext_data(page_ext, &page_alias_ops);
+	ret = atomic_cmpxchg(&page_alias->do_not_move, 0, -1);
+	page_ext_put(page_ext);
+	return ret;
+}
+
+void end_pinned_migration(struct page *page){
+	struct page_ext *page_ext = page_ext_get(page);
+	struct page_alias *page_alias =
+		page_ext_data(page_ext, &page_alias_ops);
+	atomic_set(&page_alias->do_not_move, 0);
+	page_ext_put(page_ext);
+}
+
+
 
 //atomic_t
 //vunmap

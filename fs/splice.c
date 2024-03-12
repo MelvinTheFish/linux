@@ -1462,7 +1462,7 @@ static int iter_to_pipe(struct iov_iter *from, struct pipe_inode_info *pipe,
 			p = alias_vmap(&pages[i], 1);
 			int size = min_t(int, left, PAGE_SIZE - start);
 			buf.vmap_ptr = p;
-			add_to_alias_rmap(pages[i], buf.vmap_ptr);
+			// add_to_alias_rmap(pages[i], buf.vmap_ptr);
 			buf.page = NULL;
 			//printk(KERN_INFO "NIZAN: write after init %d", (void*)(vmalloc_to_page(buf.vmap_ptr)) == (void*)buf.page);
 			//printk(KERN_INFO "NIZAN is_alias_rmap_empty AFTER init = %d", is_alias_rmap_empty(buf.page));

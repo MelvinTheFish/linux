@@ -15,11 +15,11 @@
 #include <linux/of.h>
 #include <uapi/linux/iommu.h>
 
-#define IOMMU_READ	(1 << 0)
-#define IOMMU_WRITE	(1 << 1)
-#define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
-#define IOMMU_NOEXEC	(1 << 3)
-#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+#define IOMMU_READ (1 << 0)
+#define IOMMU_WRITE (1 << 1)
+#define IOMMU_CACHE (1 << 2) /* DMA cache coherency */
+#define IOMMU_NOEXEC (1 << 3)
+#define IOMMU_MMIO (1 << 4) /* e.g. things like MSI doorbells */
 /*
  * Where the bus hardware includes a privilege level as part of its access type
  * markings, and certain devices are capable of issuing transactions marked as
@@ -29,7 +29,7 @@
  * This would usually imply the same permissions as kernel mappings on the CPU,
  * if the IOMMU page table format is equivalent.
  */
-#define IOMMU_PRIV	(1 << 5)
+#define IOMMU_PRIV (1 << 5)
 
 struct iommu_ops;
 struct iommu_group;
@@ -43,27 +43,28 @@ struct iommu_fault_event;
 struct iommu_dma_cookie;
 
 /* iommu fault flags */
-#define IOMMU_FAULT_READ	0x0
-#define IOMMU_FAULT_WRITE	0x1
+#define IOMMU_FAULT_READ 0x0
+#define IOMMU_FAULT_WRITE 0x1
 
-typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
-			struct device *, unsigned long, int, void *);
+typedef int (*iommu_fault_handler_t)(struct iommu_domain *, struct device *,
+				     unsigned long, int, void *);
 typedef int (*iommu_dev_fault_handler_t)(struct iommu_fault *, void *);
 
 struct iommu_domain_geometry {
 	dma_addr_t aperture_start; /* First address that can be mapped    */
-	dma_addr_t aperture_end;   /* Last address that can be mapped     */
-	bool force_aperture;       /* DMA only allowed in mappable range? */
+	dma_addr_t aperture_end; /* Last address that can be mapped     */
+	bool force_aperture; /* DMA only allowed in mappable range? */
 };
 
 /* Domain feature flags */
-#define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
-#define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
+#define __IOMMU_DOMAIN_PAGING (1U << 0) /* Support for iommu_map/unmap */
+#define __IOMMU_DOMAIN_DMA_API \
+	(1U << 1) /* Domain for use in DMA-API
 					      implementation              */
-#define __IOMMU_DOMAIN_PT	(1U << 2)  /* Domain is identity mapped   */
-#define __IOMMU_DOMAIN_DMA_FQ	(1U << 3)  /* DMA-API uses flush queue    */
+#define __IOMMU_DOMAIN_PT (1U << 2) /* Domain is identity mapped   */
+#define __IOMMU_DOMAIN_DMA_FQ (1U << 3) /* DMA-API uses flush queue    */
 
-#define __IOMMU_DOMAIN_SVA	(1U << 4)  /* Shared process address space */
+#define __IOMMU_DOMAIN_SVA (1U << 4) /* Shared process address space */
 
 #define IOMMU_DOMAIN_ALLOC_FLAGS ~__IOMMU_DOMAIN_DMA_FQ
 /*
@@ -82,20 +83,18 @@ struct iommu_domain_geometry {
  *	IOMMU_DOMAIN_SVA	- DMA addresses are shared process addresses
  *				  represented by mm_struct's.
  */
-#define IOMMU_DOMAIN_BLOCKED	(0U)
-#define IOMMU_DOMAIN_IDENTITY	(__IOMMU_DOMAIN_PT)
-#define IOMMU_DOMAIN_UNMANAGED	(__IOMMU_DOMAIN_PAGING)
-#define IOMMU_DOMAIN_DMA	(__IOMMU_DOMAIN_PAGING |	\
-				 __IOMMU_DOMAIN_DMA_API)
-#define IOMMU_DOMAIN_DMA_FQ	(__IOMMU_DOMAIN_PAGING |	\
-				 __IOMMU_DOMAIN_DMA_API |	\
-				 __IOMMU_DOMAIN_DMA_FQ)
-#define IOMMU_DOMAIN_SVA	(__IOMMU_DOMAIN_SVA)
+#define IOMMU_DOMAIN_BLOCKED (0U)
+#define IOMMU_DOMAIN_IDENTITY (__IOMMU_DOMAIN_PT)
+#define IOMMU_DOMAIN_UNMANAGED (__IOMMU_DOMAIN_PAGING)
+#define IOMMU_DOMAIN_DMA (__IOMMU_DOMAIN_PAGING | __IOMMU_DOMAIN_DMA_API)
+#define IOMMU_DOMAIN_DMA_FQ \
+	(__IOMMU_DOMAIN_PAGING | __IOMMU_DOMAIN_DMA_API | __IOMMU_DOMAIN_DMA_FQ)
+#define IOMMU_DOMAIN_SVA (__IOMMU_DOMAIN_SVA)
 
 struct iommu_domain {
 	unsigned type;
 	const struct iommu_domain_ops *ops;
-	unsigned long pgsize_bitmap;	/* Bitmap of page sizes in use */
+	unsigned long pgsize_bitmap; /* Bitmap of page sizes in use */
 	struct iommu_domain_geometry geometry;
 	struct iommu_dma_cookie *iova_cookie;
 	enum iommu_page_response_code (*iopf_handler)(struct iommu_fault *fault,
@@ -106,7 +105,7 @@ struct iommu_domain {
 			iommu_fault_handler_t handler;
 			void *handler_token;
 		};
-		struct {	/* IOMMU_DOMAIN_SVA */
+		struct { /* IOMMU_DOMAIN_SVA */
 			struct mm_struct *mm;
 			int users;
 		};
@@ -119,9 +118,9 @@ static inline bool iommu_is_dma_domain(struct iommu_domain *domain)
 }
 
 enum iommu_cap {
-	IOMMU_CAP_CACHE_COHERENCY,	/* IOMMU_CACHE is supported */
-	IOMMU_CAP_NOEXEC,		/* IOMMU_NOEXEC flag */
-	IOMMU_CAP_PRE_BOOT_PROTECTION,	/* Firmware says it used the IOMMU for
+	IOMMU_CAP_CACHE_COHERENCY, /* IOMMU_CACHE is supported */
+	IOMMU_CAP_NOEXEC, /* IOMMU_NOEXEC flag */
+	IOMMU_CAP_PRE_BOOT_PROTECTION, /* Firmware says it used the IOMMU for
 					   DMA protection and we should too */
 	/*
 	 * Per-device flag indicating if enforce_cache_coherency() will work on
@@ -163,11 +162,11 @@ enum iommu_resv_type {
  * @free: Callback to free associated memory allocations
  */
 struct iommu_resv_region {
-	struct list_head	list;
-	phys_addr_t		start;
-	size_t			length;
-	int			prot;
-	enum iommu_resv_type	type;
+	struct list_head list;
+	phys_addr_t start;
+	size_t length;
+	int prot;
+	enum iommu_resv_type type;
 	void (*free)(struct device *dev, struct iommu_resv_region *region);
 };
 
@@ -196,9 +195,9 @@ enum iommu_dev_features {
 	IOMMU_DEV_FEAT_IOPF,
 };
 
-#define IOMMU_NO_PASID	(0U) /* Reserved for DMA w/o PASID */
-#define IOMMU_FIRST_GLOBAL_PASID	(1U) /*starting range for allocation */
-#define IOMMU_PASID_INVALID	(-1U)
+#define IOMMU_NO_PASID (0U) /* Reserved for DMA w/o PASID */
+#define IOMMU_FIRST_GLOBAL_PASID (1U) /*starting range for allocation */
+#define IOMMU_PASID_INVALID (-1U)
 typedef unsigned int ioasid_t;
 
 #ifdef CONFIG_IOMMU_API
@@ -220,11 +219,11 @@ typedef unsigned int ioasid_t;
  * later instead of ->iotlb_sync(), so drivers may optimise accordingly.
  */
 struct iommu_iotlb_gather {
-	unsigned long		start;
-	unsigned long		end;
-	size_t			pgsize;
-	struct list_head	freelist;
-	bool			queued;
+	unsigned long start;
+	unsigned long end;
+	size_t pgsize;
+	struct list_head freelist;
+	bool queued;
 };
 
 /**
@@ -284,8 +283,7 @@ struct iommu_ops {
 	int (*dev_enable_feat)(struct device *dev, enum iommu_dev_features f);
 	int (*dev_disable_feat)(struct device *dev, enum iommu_dev_features f);
 
-	int (*page_response)(struct device *dev,
-			     struct iommu_fault_event *evt,
+	int (*page_response)(struct device *dev, struct iommu_fault_event *evt,
 			     struct iommu_page_response *msg);
 
 	int (*def_domain_type)(struct device *dev);
@@ -344,7 +342,8 @@ struct iommu_domain_ops {
 	size_t (*unmap_pages)(struct iommu_domain *domain, unsigned long iova,
 			      size_t pgsize, size_t pgcount,
 			      struct iommu_iotlb_gather *iotlb_gather);
-
+	int (*migrate_page)(struct iommu_domain *domain, unsigned long iova,
+			    bool prepare);
 	void (*flush_iotlb_all)(struct iommu_domain *domain);
 	void (*iotlb_sync_map)(struct iommu_domain *domain, unsigned long iova,
 			       size_t size);
@@ -424,27 +423,25 @@ struct iommu_fault_param {
  */
 struct dev_iommu {
 	struct mutex lock;
-	struct iommu_fault_param	*fault_param;
-	struct iopf_device_param	*iopf_param;
-	struct iommu_fwspec		*fwspec;
-	struct iommu_device		*iommu_dev;
-	void				*priv;
-	u32				max_pasids;
-	u32				attach_deferred:1;
-	u32				pci_32bit_workaround:1;
-	u32				require_direct:1;
+	struct iommu_fault_param *fault_param;
+	struct iopf_device_param *iopf_param;
+	struct iommu_fwspec *fwspec;
+	struct iommu_device *iommu_dev;
+	void *priv;
+	u32 max_pasids;
+	u32 attach_deferred : 1;
+	u32 pci_32bit_workaround : 1;
+	u32 require_direct : 1;
 };
 
 int iommu_device_register(struct iommu_device *iommu,
-			  const struct iommu_ops *ops,
-			  struct device *hwdev);
+			  const struct iommu_ops *ops, struct device *hwdev);
 void iommu_device_unregister(struct iommu_device *iommu);
-int  iommu_device_sysfs_add(struct iommu_device *iommu,
-			    struct device *parent,
-			    const struct attribute_group **groups,
-			    const char *fmt, ...) __printf(4, 5);
+int iommu_device_sysfs_add(struct iommu_device *iommu, struct device *parent,
+			   const struct attribute_group **groups,
+			   const char *fmt, ...) __printf(4, 5);
 void iommu_device_sysfs_remove(struct iommu_device *iommu);
-int  iommu_device_link(struct iommu_device   *iommu, struct device *link);
+int iommu_device_link(struct iommu_device *iommu, struct device *link);
 void iommu_device_unlink(struct iommu_device *iommu, struct device *link);
 int iommu_deferred_attach(struct device *dev, struct iommu_domain *domain);
 
@@ -455,8 +452,8 @@ static inline struct iommu_device *dev_to_iommu_device(struct device *dev)
 
 static inline void iommu_iotlb_gather_init(struct iommu_iotlb_gather *gather)
 {
-	*gather = (struct iommu_iotlb_gather) {
-		.start	= ULONG_MAX,
+	*gather = (struct iommu_iotlb_gather){
+		.start = ULONG_MAX,
 		.freelist = LIST_HEAD_INIT(gather->freelist),
 	};
 }
@@ -467,8 +464,7 @@ extern bool device_iommu_capable(struct device *dev, enum iommu_cap cap);
 extern bool iommu_group_has_isolated_msi(struct iommu_group *group);
 extern struct iommu_domain *iommu_domain_alloc(const struct bus_type *bus);
 extern void iommu_domain_free(struct iommu_domain *domain);
-extern int iommu_attach_device(struct iommu_domain *domain,
-			       struct device *dev);
+extern int iommu_attach_device(struct iommu_domain *domain, struct device *dev);
 extern void iommu_detach_device(struct iommu_domain *domain,
 				struct device *dev);
 extern int iommu_sva_unbind_gpasid(struct iommu_domain *domain,
@@ -479,15 +475,16 @@ extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		     phys_addr_t paddr, size_t size, int prot, gfp_t gfp);
 extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
 			  size_t size);
-extern size_t iommu_unmap_fast(struct iommu_domain *domain,
-			       unsigned long iova, size_t size,
+extern size_t iommu_unmap_fast(struct iommu_domain *domain, unsigned long iova,
+			       size_t size,
 			       struct iommu_iotlb_gather *iotlb_gather);
 extern ssize_t iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 			    struct scatterlist *sg, unsigned int nents,
 			    int prot, gfp_t gfp);
-extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
+extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
+				      dma_addr_t iova);
 extern void iommu_set_fault_handler(struct iommu_domain *domain,
-			iommu_fault_handler_t handler, void *token);
+				    iommu_fault_handler_t handler, void *token);
 
 extern void iommu_get_resv_regions(struct device *dev, struct list_head *list);
 extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
@@ -518,9 +515,8 @@ extern int iommu_group_for_each_dev(struct iommu_group *group, void *data,
 extern struct iommu_group *iommu_group_get(struct device *dev);
 extern struct iommu_group *iommu_group_ref_get(struct iommu_group *group);
 extern void iommu_group_put(struct iommu_group *group);
-extern int iommu_register_device_fault_handler(struct device *dev,
-					iommu_dev_fault_handler_t handler,
-					void *data);
+extern int iommu_register_device_fault_handler(
+	struct device *dev, iommu_dev_fault_handler_t handler, void *data);
 
 extern int iommu_unregister_device_fault_handler(struct device *dev);
 
@@ -533,8 +529,7 @@ extern int iommu_group_id(struct iommu_group *group);
 extern struct iommu_domain *iommu_group_default_domain(struct iommu_group *);
 
 int iommu_enable_nesting(struct iommu_domain *domain);
-int iommu_set_pgtable_quirks(struct iommu_domain *domain,
-		unsigned long quirks);
+int iommu_set_pgtable_quirks(struct iommu_domain *domain, unsigned long quirks);
 
 void iommu_set_dma_strict(void);
 
@@ -548,7 +543,7 @@ static inline void iommu_flush_iotlb_all(struct iommu_domain *domain)
 }
 
 static inline void iommu_iotlb_sync(struct iommu_domain *domain,
-				  struct iommu_iotlb_gather *iotlb_gather)
+				    struct iommu_iotlb_gather *iotlb_gather)
 {
 	if (domain->ops->iotlb_sync)
 		domain->ops->iotlb_sync(domain, iotlb_gather);
@@ -567,16 +562,15 @@ static inline void iommu_iotlb_sync(struct iommu_domain *domain,
  * are disjoint. For many IOMMUs, flushing the IOMMU in this case is better
  * than merging the two, which might lead to unnecessary invalidations.
  */
-static inline
-bool iommu_iotlb_gather_is_disjoint(struct iommu_iotlb_gather *gather,
-				    unsigned long iova, size_t size)
+static inline bool
+iommu_iotlb_gather_is_disjoint(struct iommu_iotlb_gather *gather,
+			       unsigned long iova, size_t size)
 {
 	unsigned long start = iova, end = start + size - 1;
 
 	return gather->end != 0 &&
-		(end + 1 < gather->start || start > gather->end + 1);
+	       (end + 1 < gather->start || start > gather->end + 1);
 }
-
 
 /**
  * iommu_iotlb_gather_add_range - Gather for address-based TLB invalidation
@@ -588,8 +582,9 @@ bool iommu_iotlb_gather_is_disjoint(struct iommu_iotlb_gather *gather,
  * where only the address range matters, and simply minimising intermediate
  * syncs is preferred.
  */
-static inline void iommu_iotlb_gather_add_range(struct iommu_iotlb_gather *gather,
-						unsigned long iova, size_t size)
+static inline void
+iommu_iotlb_gather_add_range(struct iommu_iotlb_gather *gather,
+			     unsigned long iova, size_t size)
 {
 	unsigned long end = iova + size - 1;
 
@@ -610,9 +605,10 @@ static inline void iommu_iotlb_gather_add_range(struct iommu_iotlb_gather *gathe
  * pages, or with page size/table level hints which cannot be gathered if they
  * differ.
  */
-static inline void iommu_iotlb_gather_add_page(struct iommu_domain *domain,
-					       struct iommu_iotlb_gather *gather,
-					       unsigned long iova, size_t size)
+static inline void
+iommu_iotlb_gather_add_page(struct iommu_domain *domain,
+			    struct iommu_iotlb_gather *gather,
+			    unsigned long iova, size_t size)
 {
 	/*
 	 * If the new page is disjoint from the current range or is mapped at
@@ -652,22 +648,22 @@ struct iommu_group *fsl_mc_device_group(struct device *dev);
  * consumers.
  */
 struct iommu_fwspec {
-	const struct iommu_ops	*ops;
-	struct fwnode_handle	*iommu_fwnode;
-	u32			flags;
-	unsigned int		num_ids;
-	u32			ids[];
+	const struct iommu_ops *ops;
+	struct fwnode_handle *iommu_fwnode;
+	u32 flags;
+	unsigned int num_ids;
+	u32 ids[];
 };
 
 /* ATS is supported */
-#define IOMMU_FWSPEC_PCI_RC_ATS			(1 << 0)
+#define IOMMU_FWSPEC_PCI_RC_ATS (1 << 0)
 
 /**
  * struct iommu_sva - handle to a device-mm bond
  */
 struct iommu_sva {
-	struct device			*dev;
-	struct iommu_domain		*domain;
+	struct device *dev;
+	struct iommu_domain *domain;
 };
 
 int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
@@ -720,13 +716,13 @@ void iommu_device_release_dma_owner(struct device *dev);
 
 struct iommu_domain *iommu_sva_domain_alloc(struct device *dev,
 					    struct mm_struct *mm);
-int iommu_attach_device_pasid(struct iommu_domain *domain,
-			      struct device *dev, ioasid_t pasid);
-void iommu_detach_device_pasid(struct iommu_domain *domain,
-			       struct device *dev, ioasid_t pasid);
-struct iommu_domain *
-iommu_get_domain_for_dev_pasid(struct device *dev, ioasid_t pasid,
-			       unsigned int type);
+int iommu_attach_device_pasid(struct iommu_domain *domain, struct device *dev,
+			      ioasid_t pasid);
+void iommu_detach_device_pasid(struct iommu_domain *domain, struct device *dev,
+			       ioasid_t pasid);
+struct iommu_domain *iommu_get_domain_for_dev_pasid(struct device *dev,
+						    ioasid_t pasid,
+						    unsigned int type);
 ioasid_t iommu_alloc_global_pasid(struct device *dev);
 void iommu_free_global_pasid(ioasid_t pasid);
 #else /* CONFIG_IOMMU_API */
@@ -748,7 +744,8 @@ static inline bool device_iommu_capable(struct device *dev, enum iommu_cap cap)
 	return false;
 }
 
-static inline struct iommu_domain *iommu_domain_alloc(const struct bus_type *bus)
+static inline struct iommu_domain *
+iommu_domain_alloc(const struct bus_type *bus)
 {
 	return NULL;
 }
@@ -804,27 +801,29 @@ static inline void iommu_flush_iotlb_all(struct iommu_domain *domain)
 }
 
 static inline void iommu_iotlb_sync(struct iommu_domain *domain,
-				  struct iommu_iotlb_gather *iotlb_gather)
+				    struct iommu_iotlb_gather *iotlb_gather)
 {
 }
 
-static inline phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+static inline phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
+					     dma_addr_t iova)
 {
 	return 0;
 }
 
 static inline void iommu_set_fault_handler(struct iommu_domain *domain,
-				iommu_fault_handler_t handler, void *token)
+					   iommu_fault_handler_t handler,
+					   void *token)
 {
 }
 
 static inline void iommu_get_resv_regions(struct device *dev,
-					struct list_head *list)
+					  struct list_head *list)
 {
 }
 
 static inline void iommu_put_resv_regions(struct device *dev,
-					struct list_head *list)
+					  struct list_head *list)
 {
 }
 
@@ -906,10 +905,8 @@ static inline void iommu_group_put(struct iommu_group *group)
 {
 }
 
-static inline
-int iommu_register_device_fault_handler(struct device *dev,
-					iommu_dev_fault_handler_t handler,
-					void *data)
+static inline int iommu_register_device_fault_handler(
+	struct device *dev, iommu_dev_fault_handler_t handler, void *data)
 {
 	return -ENODEV;
 }
@@ -919,8 +916,8 @@ static inline int iommu_unregister_device_fault_handler(struct device *dev)
 	return 0;
 }
 
-static inline
-int iommu_report_device_fault(struct device *dev, struct iommu_fault_event *evt)
+static inline int iommu_report_device_fault(struct device *dev,
+					    struct iommu_fault_event *evt)
 {
 	return -ENODEV;
 }
@@ -937,7 +934,7 @@ static inline int iommu_group_id(struct iommu_group *group)
 }
 
 static inline int iommu_set_pgtable_quirks(struct iommu_domain *domain,
-		unsigned long quirks)
+					   unsigned long quirks)
 {
 	return 0;
 }
@@ -958,9 +955,10 @@ static inline void iommu_iotlb_gather_init(struct iommu_iotlb_gather *gather)
 {
 }
 
-static inline void iommu_iotlb_gather_add_page(struct iommu_domain *domain,
-					       struct iommu_iotlb_gather *gather,
-					       unsigned long iova, size_t size)
+static inline void
+iommu_iotlb_gather_add_page(struct iommu_domain *domain,
+			    struct iommu_iotlb_gather *gather,
+			    unsigned long iova, size_t size)
 {
 }
 
@@ -973,10 +971,10 @@ static inline void iommu_device_unregister(struct iommu_device *iommu)
 {
 }
 
-static inline int  iommu_device_sysfs_add(struct iommu_device *iommu,
-					  struct device *parent,
-					  const struct attribute_group **groups,
-					  const char *fmt, ...)
+static inline int iommu_device_sysfs_add(struct iommu_device *iommu,
+					 struct device *parent,
+					 const struct attribute_group **groups,
+					 const char *fmt, ...)
 {
 	return -ENODEV;
 }
@@ -1011,20 +1009,20 @@ static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
 	return -ENODEV;
 }
 
-static inline
-const struct iommu_ops *iommu_ops_from_fwnode(struct fwnode_handle *fwnode)
+static inline const struct iommu_ops *
+iommu_ops_from_fwnode(struct fwnode_handle *fwnode)
 {
 	return NULL;
 }
 
-static inline int
-iommu_dev_enable_feature(struct device *dev, enum iommu_dev_features feat)
+static inline int iommu_dev_enable_feature(struct device *dev,
+					   enum iommu_dev_features feat)
 {
 	return -ENODEV;
 }
 
-static inline int
-iommu_dev_disable_feature(struct device *dev, enum iommu_dev_features feat)
+static inline int iommu_dev_disable_feature(struct device *dev,
+					    enum iommu_dev_features feat)
 {
 	return -ENODEV;
 }
@@ -1043,8 +1041,8 @@ static inline void iommu_device_unuse_default_domain(struct device *dev)
 {
 }
 
-static inline int
-iommu_group_claim_dma_owner(struct iommu_group *group, void *owner)
+static inline int iommu_group_claim_dma_owner(struct iommu_group *group,
+					      void *owner)
 {
 	return -ENODEV;
 }
@@ -1067,8 +1065,8 @@ static inline int iommu_device_claim_dma_owner(struct device *dev, void *owner)
 	return -ENODEV;
 }
 
-static inline struct iommu_domain *
-iommu_sva_domain_alloc(struct device *dev, struct mm_struct *mm)
+static inline struct iommu_domain *iommu_sva_domain_alloc(struct device *dev,
+							  struct mm_struct *mm)
 {
 	return NULL;
 }
@@ -1096,7 +1094,9 @@ static inline ioasid_t iommu_alloc_global_pasid(struct device *dev)
 	return IOMMU_PASID_INVALID;
 }
 
-static inline void iommu_free_global_pasid(ioasid_t pasid) {}
+static inline void iommu_free_global_pasid(ioasid_t pasid)
+{
+}
 #endif /* CONFIG_IOMMU_API */
 
 /**
@@ -1110,17 +1110,20 @@ static inline void iommu_free_global_pasid(ioasid_t pasid) {}
  * stored in the given sg_table object in the provided IOMMU domain.
  */
 static inline size_t iommu_map_sgtable(struct iommu_domain *domain,
-			unsigned long iova, struct sg_table *sgt, int prot)
+				       unsigned long iova, struct sg_table *sgt,
+				       int prot)
 {
 	return iommu_map_sg(domain, iova, sgt->sgl, sgt->orig_nents, prot,
 			    GFP_KERNEL);
 }
 
 #ifdef CONFIG_IOMMU_DEBUGFS
-extern	struct dentry *iommu_debugfs_dir;
+extern struct dentry *iommu_debugfs_dir;
 void iommu_debugfs_setup(void);
 #else
-static inline void iommu_debugfs_setup(void) {}
+static inline void iommu_debugfs_setup(void)
+{
+}
 #endif
 
 #ifdef CONFIG_IOMMU_DMA
@@ -1139,25 +1142,29 @@ void iommu_dma_compose_msi_msg(struct msi_desc *desc, struct msi_msg *msg);
 struct msi_desc;
 struct msi_msg;
 
-static inline void iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 dma_limit)
+static inline void iommu_setup_dma_ops(struct device *dev, u64 dma_base,
+				       u64 dma_limit)
 {
 }
 
-static inline int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
+static inline int iommu_get_msi_cookie(struct iommu_domain *domain,
+				       dma_addr_t base)
 {
 	return -ENODEV;
 }
 
-static inline int iommu_dma_prepare_msi(struct msi_desc *desc, phys_addr_t msi_addr)
+static inline int iommu_dma_prepare_msi(struct msi_desc *desc,
+					phys_addr_t msi_addr)
 {
 	return 0;
 }
 
-static inline void iommu_dma_compose_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
+static inline void iommu_dma_compose_msi_msg(struct msi_desc *desc,
+					     struct msi_msg *msg)
 {
 }
 
-#endif	/* CONFIG_IOMMU_DMA */
+#endif /* CONFIG_IOMMU_DMA */
 
 /*
  * Newer generations of Tegra SoCs require devices' stream IDs to be directly programmed into
@@ -1166,7 +1173,8 @@ static inline void iommu_dma_compose_msi_msg(struct msi_desc *desc, struct msi_m
  */
 #define TEGRA_STREAM_ID_BYPASS 0x7f
 
-static inline bool tegra_dev_iommu_get_stream_id(struct device *dev, u32 *stream_id)
+static inline bool tegra_dev_iommu_get_stream_id(struct device *dev,
+						 u32 *stream_id)
 {
 #ifdef CONFIG_IOMMU_API
 	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
@@ -1195,8 +1203,8 @@ struct iommu_sva *iommu_sva_bind_device(struct device *dev,
 void iommu_sva_unbind_device(struct iommu_sva *handle);
 u32 iommu_sva_get_pasid(struct iommu_sva *handle);
 #else
-static inline struct iommu_sva *
-iommu_sva_bind_device(struct device *dev, struct mm_struct *mm)
+static inline struct iommu_sva *iommu_sva_bind_device(struct device *dev,
+						      struct mm_struct *mm)
 {
 	return NULL;
 }
@@ -1209,9 +1217,16 @@ static inline u32 iommu_sva_get_pasid(struct iommu_sva *handle)
 {
 	return IOMMU_PASID_INVALID;
 }
-static inline void mm_pasid_init(struct mm_struct *mm) {}
-static inline bool mm_valid_pasid(struct mm_struct *mm) { return false; }
-static inline void mm_pasid_drop(struct mm_struct *mm) {}
+static inline void mm_pasid_init(struct mm_struct *mm)
+{
+}
+static inline bool mm_valid_pasid(struct mm_struct *mm)
+{
+	return false;
+}
+static inline void mm_pasid_drop(struct mm_struct *mm)
+{
+}
 #endif /* CONFIG_IOMMU_SVA */
 
 #endif /* __LINUX_IOMMU_H */
