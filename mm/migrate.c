@@ -738,8 +738,9 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 		return -EPINMIGF; // was -EAGAIN
 	}
 
-	__set_page_alias(new_page);
-	add_to_alias_rmap(new_page, vptr);
+	__set_page_alias(new_page);//why
+	// add_to_alias_rmap(new_page, vptr);
+	alias_vmap(new_page);
 	makpitz_dbg("made pinmig!\n");
 	/* end iteration */
 	end_pinned_migration(curr_page);
@@ -785,7 +786,6 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 	if (!allow_pinmig && pinned){
 		return -EPINMIGF;
 	}
-
 	BUG_ON(folio_test_writeback(src)); /* Writeback must be complete */
 	pgoff_t *save_index = NULL;
 	struct address_space *save_mapping = NULL;
@@ -2148,7 +2148,6 @@ int migrate_pages(struct list_head *from, new_folio_t get_new_folio,
 		  unsigned int *ret_succeeded)
 {
 	makpitz_dbg("In %s\n", __func__);
-	check_migration_at_start(from);
 	int rc, rc_gather;
 	int nr_pages;
 	struct folio *folio, *folio2;
@@ -2341,7 +2340,6 @@ static int add_page_for_migration(struct mm_struct *mm, const void __user *p,
 				  int node, struct list_head *pagelist,
 				  bool migrate_all)
 {
-	check_migration_at_start(pagelist);
 	struct vm_area_struct *vma;
 	unsigned long addr;
 	struct page *page;
@@ -2418,7 +2416,6 @@ static int move_pages_and_store_status(struct mm_struct *mm, int node,
 {
 	makpitz_dbg("In %s\n", __func__);
 	int err;
-	check_migration_at_start(pagelist);
 	if (list_empty(pagelist)){
 		makpitz_dbg("In %s, pagelist is empty. returning.\n", __func__);
 		return 0;

@@ -1459,7 +1459,7 @@ static int iter_to_pipe(struct iov_iter *from, struct pipe_inode_info *pipe,
 		// printk(KERN_INFO "NIZAN: eq[1] %d", (void*)(vmalloc_to_page(p + PAGE_SIZE)) == (void*)pages[1]);
 
 		for (i = 0; i < n; i++) {
-			p = alias_vmap(&pages[i], 1);
+			p = alias_vmap(pages[i]);
 			int size = min_t(int, left, PAGE_SIZE - start);
 			buf.vmap_ptr = p;
 			// add_to_alias_rmap(pages[i], buf.vmap_ptr);
