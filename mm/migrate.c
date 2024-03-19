@@ -59,7 +59,7 @@
 
 #include "internal.h"
 
-#define DAUBE_DBG 1 // Change this to 0 to disable debugging
+#define DAUBE_DBG 0 // Change this to 0 to disable debugging
 
 // Conditional Debugging Macro
 #if DAUBE_DBG

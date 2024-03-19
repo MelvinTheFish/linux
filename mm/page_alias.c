@@ -79,12 +79,13 @@ void *alias_vmap(struct page *page)
 	 * doesn't already exist and return a 
 	 * pointer to its vmap
 	 */
-	void *vmap_address;
+	void *vmap_address, *old_rmap;
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
 	vmap_address = page_alias->kernel_rmap;
+	old_rmap = page_alias->kernel_rmap;
 	if(atomic_inc_not_zero(&page_alias->kernel_ref_count)){
 		/* could also always skip this, but it could save unecessary vmaps and vunmaps */
 		pr_info("ref count is not zero\n");
@@ -97,8 +98,11 @@ void *alias_vmap(struct page *page)
 		pr_info("in %s, doing try_cmpxchg\n", __func__);
 		page_ext = page_ext_get(page);
 		page_alias = page_ext_data(page_ext, &page_alias_ops);
-		if (!try_cmpxchg(&page_alias->kernel_rmap, (void*)NULL, vmap_address)){
+		pr_info("Is page alias null? %d\n", (page_alias==NULL));
+		pr_info("Is page alias's kernel rmap null? %d\n", (page_alias->kernel_rmap==NULL));
+		if (cmpxchg(&page_alias->kernel_rmap, old_rmap, vmap_address)){
 		/* someone else created the vmap before us */
+			pr_info("was null but created before me!\n");
 			page_ext_put(page_ext); /* because vmap might sleep */
 			vunmap(vmap_address);
 			page_ext = page_ext_get(page);
@@ -110,22 +114,30 @@ void *alias_vmap(struct page *page)
 	}
 	 /* if it's zero, bug. */
 	page_ext_put(page_ext);
+	BUG_ON(!is_vmalloc_addr(vmap_address));
 	return vmap_address;
 }
 
 void alias_vunmap(void *p)
 {
+	BUG_ON(!is_vmalloc_addr(p));
 	struct page* page = alias_vmap_to_page(p);
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
 	if (!atomic_add_unless(&page_alias->kernel_ref_count, -1, 1)){
 		if(atomic_cmpxchg(&page_alias->kernel_ref_count, 1, 0))
+		{
+			page_ext_put(page_ext); /* because vmap might sleep */
 			vunmap(p);
-		else
+		}
+		else {
 		/* Either someone else unmapped, or someone else added a referance. */
 			atomic_dec(&page_alias->kernel_ref_count);
+			page_ext_put(page_ext);
+		}
 	}
+	alias_page_close(page);
 	p = NULL;/* caller expects it to be NULL after alleged unmapping */
 }
 
@@ -135,7 +147,7 @@ struct page *alias_vmap_to_page(void *p)
 	page = vmalloc_to_page(p);
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
-		page_ext_data(page_ext, &page_alias_ops);
+		page_ext_data(page_ext, &page_alias_ops);//here
 	while(atomic_cmpxchg(&page_alias->do_not_move, -1, -1));
 	atomic_inc(&page_alias->do_not_move);
 	page_ext_put(page_ext);

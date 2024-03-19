@@ -301,13 +301,7 @@ static int iommu_skip_te_disable;
 
 const struct iommu_ops intel_iommu_ops;
 
-static bool intel_is_migration_supported(struct intel_iommu *iommu, struct dmar_domain *domain){
-	//also additionall chacks by nadav
-	if (!ecap_slads(iommu->ecap)){
-		return false;
-	}
-	return true;
-}
+
 
 
 
@@ -640,6 +634,25 @@ struct context_entry *iommu_context_addr(struct intel_iommu *iommu, u8 bus,
 	return &context[devfn];
 }
 
+static bool intel_is_migration_supported(struct intel_iommu *iommu, struct dmar_domain *domain){
+	/* If a read-write buffer is used, we would not always see the 
+	 *
+	 * dirty bit change, so our solution wouldn't work
+	 */
+
+	if (rwbf_quirk || cap_rwbf(iommu->cap)) 
+		return false;
+
+     	/* Require also page-walk coherency to ensure dirty-bit tracking. */ 
+	if (!iommu_paging_structure_coherency(iommu))
+		return false; 
+
+	/* We do need support for dirty-bit tracking. */ 
+	if (!domain->use_first_level && !ecap_slads(iommu->ecap)) 
+		return false; 
+
+	return true;
+}
 /**
  * is_downstream_to_pci_bridge - test if a device belongs to the PCI
  *				 sub-hierarchy of a candidate PCI-PCI bridge

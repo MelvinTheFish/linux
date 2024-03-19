@@ -60,7 +60,7 @@ void splice_close_page(struct pipe_buffer *buf)
 	if (buf->vmap_ptr == 0)
 		put_page(buf->page);
 	else
-		alias_vunmap(buf->vmap_ptr);
+		alias_vunmap(buf->vmap_ptr);//here
 }
 
 struct page *splice_alias_vmap_to_page(struct pipe_buffer *buf)
