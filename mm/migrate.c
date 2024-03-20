@@ -59,7 +59,17 @@
 
 #include "internal.h"
 
-#define DAUBE_DBG 0 // Change this to 0 to disable debugging
+#define DAUBE_TRACE 1 // Change this to 0 to disable debugging
+
+// Conditional Debugging Macro
+#if DAUBE_TRACE
+#define makpitz_trace(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define makpitz_trace(fmt, ...)
+#endif
+
+
+#define DAUBE_DBG 1 // Change this to 0 to disable debugging
 
 // Conditional Debugging Macro
 #if DAUBE_DBG
@@ -198,7 +208,7 @@ static bool remove_migration_pte(struct folio *folio,
 				 void *old)
 {
 	DEFINE_FOLIO_VMA_WALK(pvmw, old, vma, addr, PVMW_SYNC | PVMW_MIGRATION);
-        makpitz_dbg("In remove_migration_pte\n");
+        makpitz_trace("In %s\n", __func__);
 
 	while (page_vma_mapped_walk(&pvmw)) {
 		rmap_t rmap_flags = RMAP_NONE;
@@ -301,7 +311,7 @@ static bool remove_migration_pte(struct folio *folio,
  */
 void remove_migration_ptes(struct folio *src, struct folio *dst, bool locked)
 {
-        makpitz_dbg("In remove_migration_ptes\n");
+        makpitz_trace("In %s\n", __func__);
 	struct rmap_walk_control rwc = {
 		.rmap_one = remove_migration_pte,
 		.arg = src,
@@ -421,17 +431,17 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 			  pgoff_t *save_index,
 			  struct address_space *save_mapping)
 {
+        makpitz_trace("In %s\n", __func__);
 	XA_STATE(xas, &mapping->i_pages, folio_index(folio));
 	struct zone *oldzone, *newzone;
 	int dirty;
 	int expected_count = folio_expected_refs(mapping, folio) + extra_count;
 	long nr = folio_nr_pages(folio);
-	makpitz_dbg("in folio_migrate_mapping");
 	if (!mapping) {
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
 		if (count != expected_count) {
-			makpitz_dbg("ref count is wrong. expected: %d, got: %d\n",
+			makpitz_trace("ref count is wrong. expected: %d, got: %d\n",
 				expected_count, count);
 			return -EAGAIN;
 		}
@@ -675,22 +685,23 @@ void clean_folio_migrate_mapping(struct folio *newfolio, struct folio *folio,
 				 pgoff_t *save_index,
 				 struct address_space *save_mapping)
 {
-	makpitz_dbg("In clean_folio_migrate_mapping.\n");
+        makpitz_trace("In %s\n", __func__);
 	//TODO: do save_swapbacked instead maybe...
-	makpitz_dbg("restoring swapbacked\n");
+	makpitz_trace("restoring swapbacked\n");
 	if (folio_test_swapbacked(folio))
 		__folio_clear_swapbacked(newfolio);
-	makpitz_dbg("restoring index\n");
+	makpitz_trace("restoring index\n");
 	if (save_index)
 		newfolio->index = *save_index;
-	makpitz_dbg("restoring mapping\n");
+	makpitz_trace("restoring mapping\n");
 	newfolio->mapping = save_mapping;
-        makpitz_dbg("In clean_folio_migrate_mapping, NOT putting the dst folio this time\n");
+        makpitz_trace("In clean_folio_migrate_mapping, NOT putting the dst folio this time\n");
 	folio_put(newfolio); //? delete put
 }
 
 void kernel_migrate_pinned_page_prepare(struct folio *folio)
 {
+	makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
 	void *vptr = get_alias_rmap(page);
 	pte_t *vpte = virt_to_kpte((unsigned long)vptr);
@@ -704,15 +715,19 @@ void kernel_migrate_pinned_page_prepare(struct folio *folio)
 
 int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *folio)
 {
-	makpitz_dbg("In check_after_migrate_copy\n");
+        makpitz_trace("In %s\n", __func__);
 	struct page *curr_page, *new_page;
 	void *vptr;
 	pte_t *curr_pte, new_pte, old_pte;
 	int young;
+	int pinned;
 
 	curr_page = folio_page(folio, 0);
 	new_page = folio_page(newfolio, 0);
-	if (is_alias_rmap_empty(curr_page) == 0)
+	makpitz_trace("calling is_alias_rmap_empty in %s\n", __func__);
+	pinned = is_alias_rmap_empty(curr_page);
+	makpitz_trace("in %s, !is_alias_rmap_empty made pinned=%d\n", __func__, pinned);
+	if (pinned)
 		return MIGRATEPAGE_SUCCESS;
 	start_pinned_migration(curr_page);
 	vptr = get_alias_rmap(curr_page); //need later to make sure we do that to all references and not just one.
@@ -722,7 +737,7 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	curr_pte = virt_to_kpte((unsigned long)vptr);
 	old_pte = *curr_pte;
 	young = pte_young(*curr_pte);
-	makpitz_dbg("current pte's access bit: %d\n", young);
+	makpitz_trace("current pte's access bit: %d\n", young);
 	if (young)
 		return -EPINMIGF;
 	new_pte = mk_pte(new_page, pte_pgprot(old_pte));
@@ -734,14 +749,14 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	
 
 	if (!try_cmpxchg(curr_pte, &old_pte, new_pte)) {
-		makpitz_dbg("pinmig failed, old and current pte differ.\n");
+		makpitz_trace("pinmig failed, old and current pte differ.\n");
 		return -EPINMIGF; // was -EAGAIN
 	}
 
 	__set_page_alias(new_page);//why
 	// add_to_alias_rmap(new_page, vptr);
 	alias_vmap(new_page);
-	makpitz_dbg("made pinmig!\n");
+	makpitz_trace("made pinmig!\n");
 	/* end iteration */
 	end_pinned_migration(curr_page);
 	return MIGRATEPAGE_SUCCESS;
@@ -749,10 +764,11 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 
 int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
+        makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
 	int pinned;
-
-	pinned = (is_alias_rmap_empty(page) == 1);
+	makpitz_dbg("calling is_alias_rmap_empty in %s\n", __func__);
+	pinned = (!is_alias_rmap_empty(page));
 	if (pinned){
 		makpitz_dbg("handling a pinned page\n");
 	}
@@ -782,7 +798,9 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 
 
 	struct page *page = folio_page(src, 0);
-	pinned = (is_alias_rmap_empty(page) == 1);
+	makpitz_trace("calling is_alias_rmap_empty in %s\n", __func__);
+	pinned = (!is_alias_rmap_empty(page));
+	makpitz_trace("in %s, !is_alias_rmap_empty made pinned=%d\n", __func__, pinned);
 	if (!allow_pinmig && pinned){
 		return -EPINMIGF;
 	}
@@ -791,7 +809,7 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 	struct address_space *save_mapping = NULL;
 	rc = folio_migrate_mapping(mapping, dst, src, extra_count, save_index,
 				   save_mapping);
-	makpitz_dbg("In migrate_folio_extra, folio_migrate_mapping returned rc=%d", rc);
+	makpitz_trace("In migrate_folio_extra, folio_migrate_mapping returned rc=%d", rc);
 
 	if (rc != MIGRATEPAGE_SUCCESS)
 		return rc;
@@ -799,12 +817,12 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 	rc = MIGRATEPAGE_SUCCESS;
 	if (mode != MIGRATE_SYNC_NO_COPY){
 		rc = folio_migrate_copy(dst, src);
-		makpitz_dbg("In migrate_folio_extra, folio_migrate_copy returned rc=%d", rc);
+		makpitz_trace("In migrate_folio_extra, folio_migrate_copy returned rc=%d", rc);
 	}
 	else
 		folio_migrate_flags(dst, src);
 	if (rc != MIGRATEPAGE_SUCCESS) {
-		makpitz_dbg(
+		makpitz_trace(
 			"in migrate_folio_extra, calling clean_folio_migrate_mapping.\n");
 		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
 		return rc;
@@ -827,7 +845,7 @@ int migrate_folio_extra(struct address_space *mapping, struct folio *dst,
 int migrate_folio(struct address_space *mapping, struct folio *dst,
 		  struct folio *src, enum migrate_mode mode)
 {
-	makpitz_dbg("in migrate_folio, calling migrate_folio_extra.\n");
+	makpitz_trace("in %s, calling migrate_folio_extra.\n", __func__);
 	return migrate_folio_extra(mapping, dst, src, mode, 0);
 }
 EXPORT_SYMBOL(migrate_folio);
@@ -876,7 +894,7 @@ static int __buffer_migrate_folio(struct address_space *mapping,
 
 	head = folio_buffers(src);
 	if (!head) {
-		makpitz_dbg(
+		makpitz_trace(
 			"in __buffer_migrate_folio, calling migrate_folio.\n");
 		return migrate_folio(mapping, dst, src, mode);
 	}
@@ -936,7 +954,7 @@ recheck_buffers:
 	else
 		folio_migrate_flags(dst, src);
 	if (rc != MIGRATEPAGE_SUCCESS) {
-		makpitz_dbg(
+		makpitz_trace(
 			"in __buffer_migrate_folio, calling clean_folio_migrate_mapping.\n");
 		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
 	}
@@ -1018,7 +1036,7 @@ int filemap_migrate_folio(struct address_space *mapping, struct folio *dst,
 	else
 		folio_migrate_flags(dst, src);
 	if (ret != MIGRATEPAGE_SUCCESS) {
-		makpitz_dbg(
+		makpitz_trace(
 			"in filemap_migrate_folio, calling clean_folio_migrate_mapping.\n");
 		clean_folio_migrate_mapping(dst, src, save_index, save_mapping);
 		return ret;
@@ -1091,7 +1109,7 @@ static int fallback_migrate_folio(struct address_space *mapping,
 	 */
 	if (!filemap_release_folio(src, GFP_KERNEL))
 		return mode == MIGRATE_SYNC ? -EAGAIN : -EBUSY;
-	makpitz_dbg("in fallback_migrate_folio, calling migrate_folio.\n");
+	makpitz_trace("in fallback_migrate_folio, calling migrate_folio.\n");
 	return migrate_folio(mapping, dst, src, mode);
 }
 
@@ -1119,7 +1137,7 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 		struct address_space *mapping = folio_mapping(src);
 
 		if (!mapping) {
-			makpitz_dbg(
+			makpitz_trace(
 				"in move_to_new_folio, calling migrate_folio.\n");
 			rc = migrate_folio(mapping, dst, src, mode);
 		} else if (mapping->a_ops->migrate_folio) {
@@ -1130,12 +1148,12 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 			 * migrate_folio callback. This is the most common path
 			 * for page migration.
 			 */
-			makpitz_dbg(
+			makpitz_trace(
 				"in move_to_new_folio, calling migrate_folio.\n");
 			rc = mapping->a_ops->migrate_folio(mapping, dst, src,
 							   mode);
 		} else {
-			makpitz_dbg(
+			makpitz_trace(
 				"in move_to_ne_folio, calling fallback_migrate_folio\n");
 			rc = fallback_migrate_folio(mapping, dst, src, mode);
 		}
@@ -1223,18 +1241,18 @@ static void migrate_folio_undo_src(struct folio *src, int page_was_mapped,
 				   struct anon_vma *anon_vma, bool locked,
 				   struct list_head *ret, bool is_failed_pinmig)
 {
-        makpitz_dbg("in %s, is_failed_pinmig =%d\n", __func__, is_failed_pinmig);
+        makpitz_trace("in %s, is_failed_pinmig =%d\n", __func__, is_failed_pinmig);
 	if (page_was_mapped)
 		remove_migration_ptes(src, src, false);
 	/* Drop an anon_vma reference if we took one */
 	if (anon_vma){
-                makpitz_dbg("In migrate_folio_undo_src, calling put_anon_vma\n");
+                makpitz_trace("In migrate_folio_undo_src, calling put_anon_vma\n");
 		put_anon_vma(anon_vma);
         }
 	if (locked)
 		folio_unlock(src);
 	// if (is_failed_pinmig){
-	// 	makpitz_dbg("In %s, returning without putting folio on ret list. instead seleting it and reinitializing it.\n", __func__);
+	// 	makpitz_trace("In %s, returning without putting folio on ret list. instead seleting it and reinitializing it.\n", __func__);
 	// 	// list_del_init(&src->lru);
 	// 	return;
 	// }
@@ -1247,7 +1265,7 @@ static void migrate_folio_undo_dst(struct folio *dst, bool locked,
 				   free_folio_t put_new_folio,
 				   unsigned long private)
 {
-        makpitz_dbg("In migrate_folio_undo_dst, putting dst folio\n");
+        makpitz_trace("In migrate_folio_undo_dst, putting dst folio\n");
 	if (locked)
 		folio_unlock(dst);
 	if (put_new_folio)
@@ -1282,18 +1300,18 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 			       enum migrate_reason reason,
 			       struct list_head *ret)
 {
-        makpitz_dbg("in migrate_folio_unmap, mode=%d and nizan is hungry\n", mode);
+        makpitz_trace("in migrate_folio_unmap, mode=%d and nizan is hungry\n", mode);
 	struct folio *dst;
 	int rc = -EAGAIN;
 	int page_was_mapped = 0;
 	struct anon_vma *anon_vma = NULL;
 	bool is_lru = !__PageMovable(&src->page);
-        // makpitz_dbg("in migrate_folio_unmap, here 0\n");
+        // makpitz_trace("in migrate_folio_unmap, here 0\n");
 	bool locked = false;
 	bool dst_locked = false;
-        // makpitz_dbg("in migrate_folio_unmap, here 1\n");
+        // makpitz_trace("in migrate_folio_unmap, here 1\n");
 	if (folio_ref_count(src) == 1) {
-                makpitz_dbg("in migrate_folio_unmap, src's refcount is 1\n");
+                makpitz_trace("in migrate_folio_unmap, src's refcount is 1\n");
 		/* Folio was freed from under us. So we are done. */
 		folio_clear_active(src);
 		folio_clear_unevictable(src);
@@ -1303,22 +1321,22 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 		return MIGRATEPAGE_SUCCESS;
 	}
         
-        makpitz_dbg("in migrate_folio_unmap, calling get_new_folio\n");
+        makpitz_trace("in migrate_folio_unmap, calling get_new_folio\n");
 	dst = get_new_folio(src, private);
-        // makpitz_dbg("in migrate_folio_unmap, here 3\n");
+        // makpitz_trace("in migrate_folio_unmap, here 3\n");
 	if (!dst){
-                makpitz_dbg("in migrate_folio_unmap, dst is 0\n");
+                makpitz_trace("in migrate_folio_unmap, dst is 0\n");
 		return -ENOMEM;
         }
 	*dstp = dst;
 
 	dst->private = NULL;
-        // makpitz_dbg("in migrate_folio_unmap, here 4\n");
+        // makpitz_trace("in migrate_folio_unmap, here 4\n");
 
 	if (!folio_trylock(src)) {
-                makpitz_dbg("In migrate_folio_unmap, !folio_trylock(src)\n");
+                makpitz_trace("In migrate_folio_unmap, !folio_trylock(src)\n");
 		if (mode == MIGRATE_ASYNC){
-                        makpitz_dbg("In migrate_folio_unmap, mode is MIGRATE_ASYNC\n");
+                        makpitz_trace("In migrate_folio_unmap, mode is MIGRATE_ASYNC\n");
 			goto out;
                 }
 
@@ -1344,7 +1362,7 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 		 * worth waiting for I/O.
 		 */
 		if (mode == MIGRATE_SYNC_LIGHT && !folio_test_uptodate(src)){
-                        makpitz_dbg("In migrate_folio_unmap, mode is MIGRATE_SYNC_LIGHT\n");
+                        makpitz_trace("In migrate_folio_unmap, mode is MIGRATE_SYNC_LIGHT\n");
 			goto out;
                 }
 		folio_lock(src);
@@ -1360,13 +1378,13 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 		 */
 		switch (mode) {
 		case MIGRATE_SYNC:
-                        makpitz_dbg("In migrate_folio_unmap last switch, mode is MIGRATE_SYNC\n");
+                        makpitz_trace("In migrate_folio_unmap last switch, mode is MIGRATE_SYNC\n");
                         break;
 		case MIGRATE_SYNC_NO_COPY:
-                        makpitz_dbg("In migrate_folio_unmap last switch, mode is MIGRATE_SYNC_NO_COPY\n");
+                        makpitz_trace("In migrate_folio_unmap last switch, mode is MIGRATE_SYNC_NO_COPY\n");
 			break;
 		default:
-                        makpitz_dbg("In migrate_folio_unmap last switch, mode is default case.\n");
+                        makpitz_trace("In migrate_folio_unmap last switch, mode is default case.\n");
 			rc = -EBUSY;
 			goto out;
 		}
@@ -1388,7 +1406,7 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 	 * (and cannot be remapped so long as we hold the page lock).
 	 */
 	if (folio_test_anon(src) && !folio_test_ksm(src)){
-                makpitz_dbg("In migrate_folio_unmap, calling anon_vma because folio_test_anon(src) && !folio_test_ksm(src)\n");
+                makpitz_trace("In migrate_folio_unmap, calling anon_vma because folio_test_anon(src) && !folio_test_ksm(src)\n");
 		anon_vma = folio_get_anon_vma(src);
         }
 
@@ -1401,13 +1419,13 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 	 * This is much like races on refcount of oldpage: just don't BUG().
 	 */
 	if (unlikely(!folio_trylock(dst))){
-                makpitz_dbg("In migrate_folio_unmap, !folio_trylock(dst) so going to out.\n");
+                makpitz_trace("In migrate_folio_unmap, !folio_trylock(dst) so going to out.\n");
 		goto out;
         }
 	dst_locked = true;
 
 	if (unlikely(!is_lru)) {
-                makpitz_dbg("In migrate_folio_unmap, !is_lru, calling __migrate_folio_record\n");
+                makpitz_trace("In migrate_folio_unmap, !is_lru, calling __migrate_folio_record\n");
 		__migrate_folio_record(dst, page_was_mapped, anon_vma);
 		return MIGRATEPAGE_UNMAP;
 	}
@@ -1426,12 +1444,12 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 	 */
 	if (!src->mapping) {
 		if (folio_test_private(src)) {
-                        makpitz_dbg("In migrate_folio_unmap, folio_test_private(src), calling try_to_free_buffers\n");
+                        makpitz_trace("In migrate_folio_unmap, folio_test_private(src), calling try_to_free_buffers\n");
 			try_to_free_buffers(src);
 			goto out;
 		}
 	} else if (folio_mapped(src)) {
-                makpitz_dbg("In migrate_folio_unmap, folio_mapped(src), calling try_to_migrate\n");
+                makpitz_trace("In migrate_folio_unmap, folio_mapped(src), calling try_to_migrate\n");
 		/* Establish migration ptes */
 		VM_BUG_ON_FOLIO(folio_test_anon(src) && !folio_test_ksm(src) &&
 					!anon_vma,
@@ -1442,13 +1460,13 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 	}
 
 	if (!folio_mapped(src)) {
-                makpitz_dbg("In migrate_folio_unmap, !folio_mapped(src), calling __migrate_folio_record\n");
+                makpitz_trace("In migrate_folio_unmap, !folio_mapped(src), calling __migrate_folio_record\n");
 		__migrate_folio_record(dst, page_was_mapped, anon_vma);
 		return MIGRATEPAGE_UNMAP;
 	}
 
 out:
-        makpitz_dbg("in migrate_folio_unmap, out lable\n");
+        makpitz_trace("in migrate_folio_unmap, out lable\n");
 	/*
 	 * A folio that has not been unmapped will be restored to
 	 * right list unless we want to retry.
@@ -1456,7 +1474,7 @@ out:
 	if (rc == -EAGAIN)
 		ret = NULL;
 
-        makpitz_dbg("in migrate_folio_unmap, calling migrate_folio_undo_src\n");
+        makpitz_trace("in migrate_folio_unmap, calling migrate_folio_undo_src\n");
 	migrate_folio_undo_src(src, page_was_mapped, anon_vma, locked, ret, false);
 	migrate_folio_undo_dst(dst, dst_locked, put_new_folio, private);
 
@@ -1469,7 +1487,7 @@ static int migrate_folio_move(free_folio_t put_new_folio, unsigned long private,
 			      enum migrate_mode mode,
 			      enum migrate_reason reason, struct list_head *ret)
 {
-        makpitz_dbg("in migrate_folio_move\n");
+        makpitz_trace("in migrate_folio_move\n");
 	int rc;
 	int page_was_mapped = 0;
 	struct anon_vma *anon_vma = NULL;
@@ -1481,10 +1499,10 @@ static int migrate_folio_move(free_folio_t put_new_folio, unsigned long private,
 	prev = dst->lru.prev;
 	list_del(&dst->lru);
 
-	makpitz_dbg("in migrate_folio_move, calling move_to_new_folio.\n");
+	makpitz_trace("in migrate_folio_move, calling move_to_new_folio.\n");
 	rc = move_to_new_folio(dst, src, mode);
 	is_failed_pinmig = (rc==-EPINMIGF) ? true : false;
-	makpitz_dbg("In migrate_folio_move, move_to_new_folio returned rc=%d", rc);
+	makpitz_trace("In migrate_folio_move, move_to_new_folio returned rc=%d", rc);
 	if (rc)
 		goto out;
 
@@ -1508,7 +1526,7 @@ static int migrate_folio_move(free_folio_t put_new_folio, unsigned long private,
 		remove_migration_ptes(src, dst, false);
 
 out_unlock_both:
-        makpitz_dbg("In migrate_folio_move out_unlock_both lable\n");
+        makpitz_trace("In migrate_folio_move out_unlock_both lable\n");
 	folio_unlock(dst);
 	set_page_owner_migrate_reason(&dst->page, reason);
 	/*
@@ -1516,7 +1534,7 @@ out_unlock_both:
 	 * which will not free the page because new page owner increased
 	 * refcounter.
 	 */
-        makpitz_dbg("In migrate_folio_move, putting dst folio\n");
+        makpitz_trace("In migrate_folio_move, putting dst folio\n");
 	folio_put(dst);
 
 	/*
@@ -1538,12 +1556,12 @@ out:
 	 */
 
 	if (rc == -EAGAIN) {
-                makpitz_dbg("In migrate_folio_move out lable, rc is EAGAIN\n");
+                makpitz_trace("In migrate_folio_move out lable, rc is EAGAIN\n");
 		list_add(&dst->lru, prev);
 		__migrate_folio_record(dst, page_was_mapped, anon_vma);
 		return rc;
 	}
-        makpitz_dbg("In migrate_folio_move, calling migrate_folio_undo_src\n");
+        makpitz_trace("In migrate_folio_move, calling migrate_folio_undo_src\n");
 	migrate_folio_undo_src(src, page_was_mapped, anon_vma, true, ret, is_failed_pinmig);
 	migrate_folio_undo_dst(dst, true, put_new_folio, private);
 
@@ -1644,10 +1662,10 @@ static int unmap_and_move_huge_page(new_folio_t get_new_folio,
 	}
 
 	if (!folio_mapped(src)) {
-		makpitz_dbg(
+		makpitz_trace(
 			"in unmap_and_move_huge_page, calling move_to_new_folio.\n");
 		rc = move_to_new_folio(dst, src, mode);
-		makpitz_dbg("In unmap_and_move_huge_page, move_to_new_folio returned rc=%d", rc);
+		makpitz_trace("In unmap_and_move_huge_page, move_to_new_folio returned rc=%d", rc);
 	}
 
 	if (page_was_mapped)
@@ -1836,7 +1854,7 @@ static int migrate_pages_batch(struct list_head *from,
 			       struct list_head *split_folios,
 			       struct migrate_pages_stats *stats, int nr_pass)
 {
-	makpitz_dbg("in %s, nr_pass=%d\n", __func__, nr_pass);
+	makpitz_trace("in %s, nr_pass=%d\n", __func__, nr_pass);
 	int retry = 1;
 	int thp_retry = 1;
 	int nr_failed = 0;
@@ -1853,7 +1871,7 @@ static int migrate_pages_batch(struct list_head *from,
 			!list_is_singular(from));
 
 	for (pass = 0; pass < nr_pass && retry; pass++) {
-                makpitz_dbg("In %s's first loop", __func__);
+                makpitz_trace("In %s's first loop", __func__);
 		retry = 0;
 		thp_retry = 0;
 		nr_retry_pages = 0;
@@ -1886,11 +1904,11 @@ static int migrate_pages_batch(struct list_head *from,
 				list_move_tail(&folio->lru, ret_folios);
 				continue;
 			}
-            makpitz_dbg("In %s, calling migrate_folio_unmap\n", __func__);
+            makpitz_trace("In %s, calling migrate_folio_unmap\n", __func__);
 			rc = migrate_folio_unmap(get_new_folio, put_new_folio,
 						 private, folio, &dst, mode,
 						 reason, ret_folios);
-            makpitz_dbg("In %s, after migrate_folio_unmap. rc=%d", __func__, rc);
+            makpitz_trace("In %s, after migrate_folio_unmap. rc=%d", __func__, rc);
 			/*
 			 * The rules are:
 			 *	Success: folio will be freed
@@ -1977,7 +1995,7 @@ move:
 
 	retry = 1;
 	for (pass = 0; pass < nr_pass && retry; pass++) {
-                makpitz_dbg("In %s's second loop (after move lable)", __func__);
+                makpitz_trace("In %s's second loop (after move lable)", __func__);
 		retry = 0;
 		thp_retry = 0;
 		nr_retry_pages = 0;
@@ -1990,10 +2008,10 @@ move:
 			nr_pages = folio_nr_pages(folio);
 
 			cond_resched();
-			makpitz_dbg("in %s, calling migrate_folio_move\n", __func__);
+			makpitz_trace("in %s, calling migrate_folio_move\n", __func__);
 			rc = migrate_folio_move(put_new_folio, private, folio,
 						dst, mode, reason, ret_folios);
-			makpitz_dbg("In %s, migrate_folio_move returned rc=%d", __func__, rc);
+			makpitz_trace("In %s, migrate_folio_move returned rc=%d", __func__, rc);
 			/*
 			 * The rules are:
 			 *	Success: folio will be freed
@@ -2003,29 +2021,29 @@ move:
 			 */
 			switch (rc) {
 			case -EAGAIN:
-				makpitz_dbg(
+				makpitz_trace(
 					"in migrate_pages_batch, got try again rc, pass=%d ,nr_pass=%d, retry=%d\n", pass, nr_pass, retry);
 				retry++;
 				thp_retry += is_thp;
 				nr_retry_pages += nr_pages;
 				break;
 			case MIGRATEPAGE_SUCCESS:
-				makpitz_dbg(
+				makpitz_trace(
 					"in migrate_pages_batch, got success rc\n");
 				stats->nr_succeeded += nr_pages;
 				stats->nr_thp_succeeded += is_thp;
 				break;
 			case -EPINMIGF:
-				makpitz_dbg(
+				makpitz_trace(
 					"in migrate_pages_batch, got EPINMIGF rc\n");
 				nr_failed++;
 				stats->nr_thp_failed += is_thp;
 				stats->nr_failed_pages += nr_pages;
-				makpitz_dbg("In %s, wanted to remove folio from from list, but it's maybe not working.\n", __func__);
+				makpitz_trace("In %s, wanted to remove folio from from list, but it's maybe not working.\n", __func__);
 				// list_del(&folio->lru);
 				break;
 			default:
-				makpitz_dbg(
+				makpitz_trace(
 					"in migrate_pages_batch, got default rc\n");
 				nr_failed++;
 				stats->nr_thp_failed += is_thp;
@@ -2050,7 +2068,7 @@ out:
 		struct anon_vma *anon_vma = NULL;
 
 		__migrate_folio_extract(dst, &page_was_mapped, &anon_vma);
-                makpitz_dbg("In migrate_pages_batch, calling migrate_pages_undo_src");
+                makpitz_trace("In migrate_pages_batch, calling migrate_pages_undo_src");
 		migrate_folio_undo_src(folio, page_was_mapped, anon_vma, true,
 				       ret_folios, false);
 		list_del(&dst->lru);
@@ -2058,7 +2076,7 @@ out:
 		dst = dst2;
 		dst2 = list_next_entry(dst, lru);
 	}
-        makpitz_dbg("Done migrate_pages_batch,__________________________________\n");
+        makpitz_trace("Done migrate_pages_batch,__________________________________\n");
 	return rc;
 }
 
@@ -2069,18 +2087,18 @@ static int migrate_pages_sync(struct list_head *from, new_folio_t get_new_folio,
 			      struct list_head *split_folios,
 			      struct migrate_pages_stats *stats)
 {
-        makpitz_dbg("In migrate_pages_sync.\n");
+        makpitz_trace("In migrate_pages_sync.\n");
 	int rc, nr_failed = 0;
 	LIST_HEAD(folios);
 	struct migrate_pages_stats astats;
 
 	memset(&astats, 0, sizeof(astats));
 	/* Try to migrate in batch with MIGRATE_ASYNC mode firstly */
-	makpitz_dbg("in migrate_page_sync, calling migrate_pages_batch. (first)\n");
+	makpitz_trace("in migrate_page_sync, calling migrate_pages_batch. (first)\n");
 	rc = migrate_pages_batch(from, get_new_folio, put_new_folio, private,
 				 MIGRATE_ASYNC, reason, &folios, split_folios,
 				 &astats, NR_MAX_MIGRATE_ASYNC_RETRY);
-	makpitz_dbg("In migrate_page_sync, migrate_pages_batch (first) returned rc=%d", rc);
+	makpitz_trace("In migrate_page_sync, migrate_pages_batch (first) returned rc=%d", rc);
 	stats->nr_succeeded += astats.nr_succeeded;
 	stats->nr_thp_succeeded += astats.nr_thp_succeeded;
 	stats->nr_thp_split += astats.nr_thp_split;
@@ -2100,13 +2118,13 @@ static int migrate_pages_sync(struct list_head *from, new_folio_t get_new_folio,
 	list_splice_tail_init(&folios, from);
 	while (!list_empty(from)) {
 		list_move(from->next, &folios);
-		makpitz_dbg(
+		makpitz_trace(
 			"in migrate_page_sync, calling migrate_pages_batch. (second)\n");
 		rc = migrate_pages_batch(&folios, get_new_folio, put_new_folio,
 					 private, mode, reason, ret_folios,
 					 split_folios, stats,
 					 NR_MAX_MIGRATE_SYNC_RETRY);
-        makpitz_dbg("In migrate_pages_sync, got from migrate_pages_batch (second) rc=%d", rc);
+        makpitz_trace("In migrate_pages_sync, got from migrate_pages_batch (second) rc=%d", rc);
 		list_splice_tail_init(&folios, ret_folios);
 		if (rc < 0)
 			return rc;
@@ -2147,7 +2165,7 @@ int migrate_pages(struct list_head *from, new_folio_t get_new_folio,
 		  enum migrate_mode mode, int reason,
 		  unsigned int *ret_succeeded)
 {
-	makpitz_dbg("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
 	int rc, rc_gather;
 	int nr_pages;
 	struct folio *folio, *folio2;
@@ -2184,18 +2202,18 @@ again:
 	else
 		list_splice_init(from, &folios);
 	if (mode == MIGRATE_ASYNC) {
-		makpitz_dbg("in migrate_pages, calling migrate_pages_batch before\n");
+		makpitz_trace("in migrate_pages, calling migrate_pages_batch before\n");
 		rc = migrate_pages_batch(&folios, get_new_folio, put_new_folio,
 					 private, mode, reason, &ret_folios,
 					 &split_folios, &stats,
 					 NR_MAX_MIGRATE_PAGES_RETRY);
-        makpitz_dbg("In migrate_pages, mode=MIGRATE_ASYNC, migrate_pages_batch returned rc=%d\n", rc);
+        makpitz_trace("In migrate_pages, mode=MIGRATE_ASYNC, migrate_pages_batch returned rc=%d\n", rc);
 	} else{
-                makpitz_dbg("in migrate_pages, calling migrate_pages_sync.\n");
+                makpitz_trace("in migrate_pages, calling migrate_pages_sync.\n");
 		rc = migrate_pages_sync(&folios, get_new_folio, put_new_folio,
 					private, mode, reason, &ret_folios,
 					&split_folios, &stats);
-        makpitz_dbg("In migrate_pages, migrate_pages_sync returned rc=%d\n", rc);
+        makpitz_trace("In migrate_pages, migrate_pages_sync returned rc=%d\n", rc);
         }
 		
 	list_splice_tail_init(&folios, &ret_folios);
@@ -2210,7 +2228,7 @@ again:
 		 * Failure isn't counted since all split folios of a large folio
 		 * with minimal effort, force MIGRATE_ASYNC mode and retry once.
 		 */
-		makpitz_dbg("in migrate_pages, calling migrate_pages_batch after\n");
+		makpitz_trace("in migrate_pages, calling migrate_pages_batch after\n");
 		migrate_pages_batch(&split_folios, get_new_folio, put_new_folio,
 				    private, MIGRATE_ASYNC, reason, &ret_folios,
 				    NULL, &stats, 1);
@@ -2250,14 +2268,14 @@ out:
 
 struct folio *alloc_migration_target(struct folio *src, unsigned long private)
 {
-	makpitz_dbg("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
         struct folio* tmp_for_tst;
 	struct migration_target_control *mtc;
 	gfp_t gfp_mask;
 	unsigned int order = 0;
 	int nid;
 	int zidx;
-        // makpitz_dbg("In alloc_migration_target here 1\n");
+        // makpitz_trace("In alloc_migration_target here 1\n");
 
 	mtc = (struct migration_target_control *)private;
 	gfp_mask = mtc->gfp_mask;
@@ -2265,7 +2283,7 @@ struct folio *alloc_migration_target(struct folio *src, unsigned long private)
 	if (nid == NUMA_NO_NODE)
 		nid = folio_nid(src);
 
-        // makpitz_dbg("In alloc_migration_target here 2\n");
+        // makpitz_trace("In alloc_migration_target here 2\n");
 	if (folio_test_hugetlb(src)) {
 		struct hstate *h = folio_hstate(src);
 
@@ -2274,7 +2292,7 @@ struct folio *alloc_migration_target(struct folio *src, unsigned long private)
 						    gfp_mask);
 	}
         
-        // makpitz_dbg("In alloc_migration_target here 3\n");
+        // makpitz_trace("In alloc_migration_target here 3\n");
 
 	if (folio_test_large(src)) {
 		/*
@@ -2285,14 +2303,14 @@ struct folio *alloc_migration_target(struct folio *src, unsigned long private)
 		gfp_mask |= GFP_TRANSHUGE;
 		order = folio_order(src);
 	}
-        // makpitz_dbg("In alloc_migration_target here 4\n");
+        // makpitz_trace("In alloc_migration_target here 4\n");
 	zidx = zone_idx(folio_zone(src));
 	if (is_highmem_idx(zidx) || zidx == ZONE_MOVABLE)
 		gfp_mask |= __GFP_HIGHMEM;
 
-        makpitz_dbg("In alloc_migration_target end, calling __folio_alloc\n");
+        makpitz_trace("In alloc_migration_target end, calling __folio_alloc\n");
 	tmp_for_tst =  __folio_alloc(gfp_mask, order, nid, mtc->nmask);
-        makpitz_dbg("In alloc_migration_target after __folio_alloc\n");
+        makpitz_trace("In alloc_migration_target after __folio_alloc\n");
         return tmp_for_tst;
 }
 
@@ -2312,7 +2330,7 @@ static int store_status(int __user *status, int start, int value, int nr)
 static int do_move_pages_to_node(struct mm_struct *mm,
 				 struct list_head *pagelist, int node)
 {
-	makpitz_dbg("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
 	int err;
 	struct migration_target_control mtc = {
 		.nid = node,
@@ -2414,10 +2432,10 @@ static int move_pages_and_store_status(struct mm_struct *mm, int node,
 				       int __user *status, int start, int i,
 				       unsigned long nr_pages)
 {
-	makpitz_dbg("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
 	int err;
 	if (list_empty(pagelist)){
-		makpitz_dbg("In %s, pagelist is empty. returning.\n", __func__);
+		makpitz_trace("In %s, pagelist is empty. returning.\n", __func__);
 		return 0;
 	}
 
@@ -2447,7 +2465,7 @@ static int do_pages_move(struct mm_struct *mm, nodemask_t task_nodes,
 			 const void __user *__user *pages,
 			 const int __user *nodes, int __user *status, int flags)
 {
-	makpitz_dbg("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
 	compat_uptr_t __user *compat_pages = (void __user *)pages;
 	int current_node = NUMA_NO_NODE;
 	LIST_HEAD(pagelist);
@@ -2701,7 +2719,7 @@ static int kernel_move_pages(pid_t pid, unsigned long nr_pages,
 			     const int __user *nodes, int __user *status,
 			     int flags)
 {
-	makpitz_dbg("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
 	struct mm_struct *mm;
 	int err;
 	nodemask_t task_nodes;
@@ -2731,7 +2749,7 @@ SYSCALL_DEFINE6(move_pages, pid_t, pid, unsigned long, nr_pages,
 		const void __user *__user *, pages, const int __user *, nodes,
 		int __user *, status, int, flags)
 {
-	makpitz_dbg("In SYSCALL_DEFINE6\n");
+	makpitz_trace("In SYSCALL_DEFINE6\n");
 	return kernel_move_pages(pid, nr_pages, pages, nodes, status, flags);
 }
 

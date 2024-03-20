@@ -16,19 +16,34 @@
 #define KERNEL_RMAP 0
 #define IOMMU_RMAP 1
 
-struct rmap_alias {
-	struct rmap_alias *next;
-	void *curr;
-	int type; //0 is kernel, 1 is iommu
+struct iommu_rmap {
+	struct iommu_domain *domain;
+	unsigned long iova;
+	atomic_t refcount;
 };
+
+struct iommu_rmap empty_rmap = {
+	.domain = NULL,
+	.iova = 0,
+	.refcount = ATOMIC_INIT(0)
+};
+
+int iommu_rmap_empty(struct iommu_rmap a){
+	return !(a.domain);
+}
 
 #define for_each_alias_rmap(rmap, alias) \
     for (rmap = alias->iommu_rmap_list; rmap->curr; rmap = rmap->next)
 struct page_alias {
-	atomic_t do_not_move;
+	atomic_t do_not_move; 
+	/* -2: the page was not aliased before
+	 * -1: the page is going through a migration
+	 * 0: ok to move
+	 * 1+: counter of places that currently hold the page struct
+	 */
 	atomic_t kernel_ref_count;
-	struct rmap_alias *iommu_rmap_list;
 	void* kernel_rmap;
+	struct iommu_rmap iommu_rmap;
 };
 
 static inline struct page_alias *get_page_alias(struct page_ext *page_ext)
@@ -56,9 +71,10 @@ static noinline void __set_page_ext_alias(struct page_ext *page_ext)
 {
 	struct page_alias *page_alias;
 	page_alias = get_page_alias(page_ext);
-	atomic_set(&page_alias->do_not_move, 0);
+	// atomic_set(&page_alias->do_not_move, 0);
+	atomic_set(&page_alias->do_not_move, -2);
 	atomic_set(&page_alias->kernel_ref_count, 0);
-	page_alias->iommu_rmap_list = NULL;
+	page_alias->iommu_rmap = empty_rmap;
 	page_alias->kernel_rmap = NULL;
 }
 
@@ -72,6 +88,44 @@ noinline void __set_page_alias(struct page *page)
 	__set_page_ext_alias(page_ext);
 	page_ext_put(page_ext); //unlock
 }
+
+
+void alias_iommu_rmap(struct iommu_domain *domain, unsigned long iova_pfn) {
+	/* create an iommu rmap for a single page if it 
+	 * doesn't already exist
+	 */
+	pr_info("in %s\n", __func__);
+	struct page *page = pfn_to_page(iova_pfn);
+	struct page_ext *page_ext = page_ext_get(page);
+	struct page_alias *page_alias =
+		page_ext_data(page_ext, &page_alias_ops);
+	struct iommu_rmap old_rmap = page_alias->iommu_rmap;
+	if(atomic_inc_not_zero(&old_rmap.refcount)){
+		/* unecessary */
+		pr_info("ref count is not zero\n");
+		BUG_ON(!old_rmap.iova);
+		BUG_ON(!old_rmap.domain);
+	} else{
+		/* refcount was zero, so need to create */
+		if (try_cmpxchg(&page_alias->iommu_rmap, old_rmap, vmap_address)){
+		/* someone else created the vmap before us */
+			pr_info("was null but created before me!\n");
+			page_ext_put(page_ext); /* because vmap might sleep */
+			vunmap(vmap_address);
+			page_ext = page_ext_get(page);
+			page_alias = page_ext_data(page_ext, &page_alias_ops);
+			vmap_address = page_alias->kernel_rmap;
+			BUG_ON(!vmap_address);
+		}
+		atomic_inc(&page_alias->kernel_ref_count);
+	}
+	 /* if it's zero, bug. */
+	atomic_cmpxchg(&page_alias->do_not_move, -2, 0);//If this is it's first vmap ever, allow moving it. (maybe better in the else above)
+	page_ext_put(page_ext);
+	BUG_ON(!is_vmalloc_addr(vmap_address));
+	return vmap_address;
+}
+
 
 void *alias_vmap(struct page *page)
 {
@@ -113,6 +167,7 @@ void *alias_vmap(struct page *page)
 		atomic_inc(&page_alias->kernel_ref_count);
 	}
 	 /* if it's zero, bug. */
+	atomic_cmpxchg(&page_alias->do_not_move, -2, 0);//If this is it's first vmap ever, allow moving it. (maybe better in the else above)
 	page_ext_put(page_ext);
 	BUG_ON(!is_vmalloc_addr(vmap_address));
 	return vmap_address;
@@ -165,23 +220,6 @@ void alias_page_close(struct page *page)
 	put_page(page);
 }
 
-// need to add support for list, now for one, also we didnt add an option to remove from the rmap yet.
-// void add_to_alias_rmap(struct page *page, void *ptr)
-// {
-// 	struct page_ext *page_ext = page_ext_get(page);
-// 	struct page_alias *page_alias =
-// 		page_ext_data(page_ext, &page_alias_ops);
-	
-// 	page_alias->iommu_rmap_list.curr = ptr;
-// 	int prev_count = atomic_read(&(page_alias->kernel_ref_count));
-// 	if (prev_count)
-// 		atomic_inc(&(
-// 			page_alias->kernel_ref_count)); //all of this needs to be atomic, for now like this to save time before deciding how.
-// 	else
-// 		atomic_set(&page_alias->kernel_ref_count, 1);
-// 	page_ext_put(page_ext);
-// }
-
 int get_alias_refcount(struct page *page)
 {
 	struct page_ext *page_ext = page_ext_get(page);
@@ -196,23 +234,24 @@ int get_alias_refcount(struct page *page)
 
 int is_alias_rmap_empty(struct page *page)
 {
-	/* returns 0 if empty, else 1 */
+	/* returns 1 if empty, else 0 */
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	//struct rmap_alias r = page_alias->iommu_rmap_list;
-	int i = (page_alias->iommu_rmap_list ? 1 : 0);
+	int ret = (iommu_rmap_empty(page_alias->iommu_rmap) && !(page_alias->kernel_rmap));
 	page_ext_put(page_ext);
-	return i;
+	return ret;
 }
+
 
 void *get_alias_rmap(struct page *page)
 {
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
+	void* ret = page_alias->kernel_rmap;
 	page_ext_put(page_ext);
-	return page_alias->iommu_rmap_list;
+	return ret;
 }
 
 int start_pinned_migration(struct page *page){

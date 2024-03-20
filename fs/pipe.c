@@ -874,7 +874,7 @@ void free_pipe_info(struct pipe_inode_info *pipe)
 #endif
 	struct page* tmp = pipe->tmp_page;
 	if (tmp){
-		if(is_alias_rmap_empty(tmp))
+		if(!is_alias_rmap_empty(tmp))
 			alias_vunmap(get_alias_rmap(tmp));	
 		else
 			__free_page(pipe->tmp_page);	
