@@ -2,6 +2,7 @@
 #define __LINUX_PAGE_ALIAS_H
 
 #include <linux/jump_label.h>
+#include <linux/iommu.h>
 
 #ifdef CONFIG_PAGE_ALIAS
 extern void __set_page_alias(struct page *page);
@@ -17,6 +18,8 @@ void *get_alias_rmap(struct page *page);
 int start_pinned_migration(struct page *page);
 void end_pinned_migration(struct page *page);
 int get_alias_refcount(struct page *page); //need to be atomic in the future
+void alias_iommu_remove_rmap(unsigned long iova_pfn);
+void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn);
 // void set_do_not_move(struct page *page, int i);
 
 static inline void set_page_alias(struct page *page)

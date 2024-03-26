@@ -95,15 +95,29 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn
 	/* create an iommu rmap for a single page if it 
 	 * doesn't already exist
 	 */
-	struct iommu_rmap new_rmap = {.domain = domain, .iova = iova_pfn};
+	// struct iommu_rmap new_rmap = {.domain = domain, .iova = iova_pfn};
 	struct page *page = pfn_to_page(iova_pfn);
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
-	struct iommu_rmap old_rmap = page_alias->iommu_rmap;
+	// struct iommu_rmap old_rmap = page_alias->iommu_rmap;
+	pr_info("shutaf1");
+	pr_info("is page alias null : %d\n", page_alias==NULL);
+	if(!page_alias){
+		set_page_alias(page);
+		page_ext = page_ext_get(page);
+		page_alias = page_ext_data(page_ext, &page_alias_ops);
+	}
+	pr_info("is page alias null : %d\n", page_alias==NULL);
+	pr_info("is page ext null : %d\n", page_ext==NULL);
+
+		
 	if(!atomic_inc_not_zero(&page_alias->iommu_ref_count)){
-		cmpxchg((unsigned long *)&(page_alias->iommu_rmap), *(unsigned long *)(&old_rmap), *(unsigned long *)(&new_rmap));
-		atomic_inc(&page_alias->iommu_ref_count);
+		pr_info("shutaf2");
+	// 	cmpxchg((unsigned long *)&(page_alias->iommu_rmap), *(unsigned long *)(&old_rmap), *(unsigned long *)(&new_rmap));
+	// 	pr_info("shutaf3");
+	// 	atomic_inc(&page_alias->iommu_ref_count);
+	// 	pr_info("shutaf4");
 	}
 	page_ext_put(page_ext);
 }

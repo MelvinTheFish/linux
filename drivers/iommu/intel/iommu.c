@@ -31,6 +31,7 @@
 #include "pasid.h"
 #include "cap_audit.h"
 #include "perfmon.h"
+#include <linux/page_alias.h>
 
 #define ROOT_SIZE		VTD_PAGE_SIZE
 #define CONTEXT_SIZE		VTD_PAGE_SIZE
@@ -2213,7 +2214,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 	unsigned long lvl_pages = 0;
 	phys_addr_t pteval;
 	u64 attr;
-
+	int i = 0;
 	if (unlikely(!domain_pfn_supported(domain, iov_pfn + nr_pages - 1)))
 		return -EINVAL;
 
@@ -2231,6 +2232,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 	pteval = ((phys_addr_t)phys_pfn << VTD_PAGE_SHIFT) | attr;
 
 	while (nr_pages > 0) {
+		i++;
 		uint64_t tmp;
 
 		if (!pte) {
@@ -2276,6 +2278,9 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		}
 
 		nr_pages -= lvl_pages;
+		pr_info(" iter no . %d", i);
+		pr_info("lvl_pages = %ld\n",lvl_pages);
+		alias_iommu_create_rmap(&domain->domain, iov_pfn);
 		iov_pfn += lvl_pages;
 		phys_pfn += lvl_pages;
 		pteval += lvl_pages * VTD_PAGE_SIZE;
@@ -4149,7 +4154,7 @@ static int intel_iommu_map(struct iommu_domain *domain,
 			   unsigned long iova, phys_addr_t hpa,
 			   size_t size, int iommu_prot, gfp_t gfp)
 {
-	pr_info("elbaz");
+	// pr_info("elbaz");
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	u64 max_addr;
 	int prot = 0;
