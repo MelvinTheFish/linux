@@ -16,10 +16,16 @@
 #define KERNEL_RMAP 0
 #define IOMMU_RMAP 1
 
+/*
+* This is a structue for the iommu reverse mapping, It will be used by all referances of the same page
+* and whenever a new mapping is created or removed the outside refcount (in the alisas struct)
+* changes accordingley.
+*/
 struct iommu_rmap {
 	struct iommu_domain *domain;
 	unsigned long iova;
 };
+
 
 struct iommu_rmap empty_rmap = {
 	.domain = NULL,
@@ -33,6 +39,21 @@ int iommu_rmap_empty(struct iommu_rmap a){
 
 // #define for_each_alias_rmap(rmap, alias) 
 //     for (rmap = alias->iommu_rmap_list; rmap->curr; rmap = rmap->next)
+/*
+* Struct for the page alias, it will be in the page ext of each page.
+* @ do_not_move: Page state in terms of migratability.
+* @ kernel_ref_count: Number of different kernel references to this page.
+* @ iommu_ref_count: Number of different iommu references to this page.
+* @ kernel_rmap: The vmap address of the kernel mapping for this page.
+* @ iommu_rmap: The iommu_rmap struct with the iova and domain of this page in iomnmu.
+*
+* do_not_move options: (first two values should become an enum)
+* -2: Page was never mapped before, used to allow moving right after creating the vmap.
+* -1: The page is currently going through a migration.
+* 0: Free to move.
+* Positive value: counter for how many places currently hold the page struct of this page.
+* 	it practically means that they are holing it's physical address, so can't migrate it.
+*/
 struct page_alias {
 	atomic_t do_not_move; 
 	/* -2: the page was not aliased before
@@ -90,12 +111,13 @@ noinline void __set_page_alias(struct page *page)
 	page_ext_put(page_ext); //unlock
 }
 
-
+/*
+* Create an iommu rmap for a single page if it
+* doesn't already exist.
+* If there's already an rmap, just increase the refcount.
+*/
 void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn) {
-	/*
-	 * create an iommu rmap for a single page if it 
-	 * doesn't already exist
-	 */
+	
 	// struct iommu_rmap new_rmap = {.domain = domain, .iova = iova_pfn};
 	struct page *page = pfn_to_page(iova_pfn);
 	BUG_ON(!page);
@@ -123,6 +145,12 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn
 	page_ext_put(page_ext);
 }
 
+
+/*
+* Remove iommu rmap for a page.
+* If this was the last iommu reference of that page, delete the rmap.
+* If not, only decrease the refcount.
+*/
 void alias_iommu_remove_rmap(unsigned long iova_pfn) {
 	/* 
 	 * remove an iommu rmap for a single page 
@@ -141,13 +169,12 @@ void alias_iommu_remove_rmap(unsigned long iova_pfn) {
 }
 
 
-
+/* Create a kernel alias for a single page if it 
+* doesn't already exist .If it does exist, only increase the refcount.
+* Return the vmap address, for use by the kernel caller instead of it using the page struct like it used to.
+*/
 void *alias_vmap(struct page *page)
 {
-	/* create a kernel alias for a single page if it 
-	 * doesn't already exist and return a 
-	 * pointer to its vmap
-	 */
 	void *vmap_address, *old_rmap;
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
@@ -188,6 +215,9 @@ void *alias_vmap(struct page *page)
 	return vmap_address;
 }
 
+/*
+* Remove kernel mapping
+*/
 void alias_vunmap(void *p)
 {
 	BUG_ON(!is_vmalloc_addr(p));
@@ -209,6 +239,12 @@ void alias_vunmap(void *p)
 	p = NULL;/* caller expects it to be NULL after alleged unmapping */
 }
 
+/*
+* Get the page struct from the vmap address.
+* For use in kernel places where they must use the
+* actual page struct. Wait until it's not going through
+* so it will hold the number of places that hold the page struct
+*/
 struct page *alias_vmap_to_page(void *p)
 {
 	struct page *page;
@@ -233,6 +269,10 @@ void alias_page_close(struct page *page)
 	put_page(page);
 }
 
+
+/*
+* For kernel rmap, need to rename and make one for iommu_rmap as well
+*/
 int get_alias_refcount(struct page *page)
 {
 	struct page_ext *page_ext = page_ext_get(page);
@@ -245,6 +285,9 @@ int get_alias_refcount(struct page *page)
 	return i;
 }
 
+/*
+* Used for knowing if thereare reverse mappings, for use in migration.
+*/
 int is_alias_rmap_empty(struct page *page)
 {
 	/* returns 1 if empty, else 0 */
@@ -267,6 +310,9 @@ void *get_alias_rmap(struct page *page)
 	return ret;
 }
 
+/*
+* Set do_not_move to -1, to prevent another migration to happen or getting the page struct.
+*/
 int start_pinned_migration(struct page *page){
 	int ret;
 	struct page_ext *page_ext = page_ext_get(page);
@@ -276,7 +322,9 @@ int start_pinned_migration(struct page *page){
 	page_ext_put(page_ext);
 	return ret;
 }
-
+/*
+* Set do_not_move to 0.
+*/
 void end_pinned_migration(struct page *page){
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
