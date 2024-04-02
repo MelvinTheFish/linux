@@ -63,7 +63,7 @@ void splice_close_page(struct pipe_buffer *buf)
 		alias_vunmap(buf->vmap_ptr);//here
 }
 
-struct page *splice_alias_vmap_to_page(struct pipe_buffer *buf)
+struct page *splice_alias_vmap_to_page(struct pipe_buffer *buf) //this is how u get real page - depends on wheterr it was created by us or not
 {
 	if (buf->vmap_ptr == 0)
 		return buf->page;
@@ -1459,10 +1459,12 @@ static int iter_to_pipe(struct iov_iter *from, struct pipe_inode_info *pipe,
 		// printk(KERN_INFO "NIZAN: eq[1] %d", (void*)(vmalloc_to_page(p + PAGE_SIZE)) == (void*)pages[1]);
 
 		for (i = 0; i < n; i++) {
+			// create the vmap for each page individually
 			p = alias_vmap(pages[i]);
 			int size = min_t(int, left, PAGE_SIZE - start);
 			buf.vmap_ptr = p;
 			// add_to_alias_rmap(pages[i], buf.vmap_ptr);
+			//the page is null - u cant use it anymore
 			buf.page = NULL;
 			//printk(KERN_INFO "NIZAN: write after init %d", (void*)(vmalloc_to_page(buf.vmap_ptr)) == (void*)buf.page);
 			//printk(KERN_INFO "NIZAN is_alias_rmap_empty AFTER init = %d", is_alias_rmap_empty(buf.page));

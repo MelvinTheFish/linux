@@ -701,21 +701,24 @@ void clean_folio_migrate_mapping(struct folio *newfolio, struct folio *folio,
 
 void kernel_migrate_pinned_page_prepare(struct folio *folio)
 {
+	//for vmsplice 
 	makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
 	void *vptr = get_alias_rmap(page);
+	//get the PTE
 	pte_t *vpte = virt_to_kpte((unsigned long)vptr);
 	pte_t curr_pte;
-
+	//should flush tlb first so if someone will access we will see it 
 	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
 	curr_pte = *vpte;
+	//clear the bit = from now on, we can see if someone will access the page
 	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&curr_pte.pte);
 	WRITE_ONCE(*vpte, curr_pte);
 }
 
 int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *folio)
 {
-        makpitz_trace("In %s\n", __func__);
+    makpitz_trace("In %s\n", __func__);
 	struct page *curr_page, *new_page;
 	void *vptr;
 	pte_t *curr_pte, new_pte, old_pte;
@@ -725,10 +728,11 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	curr_page = folio_page(folio, 0);
 	new_page = folio_page(newfolio, 0);
 	makpitz_trace("calling is_alias_rmap_empty in %s\n", __func__);
-	pinned = is_alias_rmap_empty(curr_page);
+	pinned = is_alias_rmap_empty(curr_page); //check if pinned
 	makpitz_trace("in %s, !is_alias_rmap_empty made pinned=%d\n", __func__, pinned);
 	if (pinned)
 		return MIGRATEPAGE_SUCCESS;
+	//update flags
 	start_pinned_migration(curr_page);
 	vptr = get_alias_rmap(curr_page); //need later to make sure we do that to all references and not just one.
 	/*start iterating, later do:
@@ -740,21 +744,25 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	makpitz_trace("current pte's access bit: %d\n", young);
 	if (young)
 		return -EPINMIGF;
+	//create pte for the new page with the flags of the old page
 	new_pte = mk_pte(new_page, pte_pgprot(old_pte));
+	//add refcount 1, beacuse we still have the vmap to there in page_alias
 	folio_ref_add(newfolio, 1);
+	//TODO: i think that there might be a bug in here. when we try to fail migrate (10 pass / 9 pass fisrt fail) - i saw that refcount at first is 1 and then us 0 for the nine other times. should check it. look for place in this file printing "ref count: 1"
 	//No pfn. wrong?
 
 	//return -EBUSY; //just to make all pin migrations fail
 	// msleep(100);
 	
-
+	//switching the pte
 	if (!try_cmpxchg(curr_pte, &old_pte, new_pte)) {
 		makpitz_trace("pinmig failed, old and current pte differ.\n");
 		return -EPINMIGF; // was -EAGAIN
 	}
-
-	__set_page_alias(new_page);//why
+	//
+	__set_page_alias(new_page);//why? this is a new page.. but maybe not neccesry
 	// add_to_alias_rmap(new_page, vptr);
+	//vmap the new page (add it)
 	alias_vmap(new_page);
 	makpitz_trace("made pinmig!\n");
 	/* end iteration */
@@ -764,7 +772,7 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 
 int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
-        makpitz_trace("In %s\n", __func__);
+    makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
 	int pinned;
 	makpitz_dbg("calling is_alias_rmap_empty in %s\n", __func__);
@@ -777,6 +785,7 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	if (pinned)
 		kernel_migrate_pinned_page_prepare(folio);
 	folio_copy(newfolio, folio);
+	
 	if (pinned && kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
 		return -EPINMIGF;//should by Ebusy
 	folio_migrate_flags(newfolio, folio);

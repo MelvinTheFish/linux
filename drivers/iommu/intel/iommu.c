@@ -2280,6 +2280,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		nr_pages -= lvl_pages;
 		pr_info(" iter no . %d", i);
 		pr_info("lvl_pages = %ld\n",lvl_pages);
+		//create rmap
 		alias_iommu_create_rmap(&domain->domain, iov_pfn);
 		iov_pfn += lvl_pages;
 		phys_pfn += lvl_pages;

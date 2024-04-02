@@ -873,6 +873,7 @@ void free_pipe_info(struct pipe_inode_info *pipe)
 		put_watch_queue(pipe->watch_queue);
 #endif
 	struct page* tmp = pipe->tmp_page;
+	//this is us. two possible ways to clear
 	if (tmp){
 		if(!is_alias_rmap_empty(tmp))
 			alias_vunmap(get_alias_rmap(tmp));	
