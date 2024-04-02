@@ -92,7 +92,8 @@ noinline void __set_page_alias(struct page *page)
 
 
 void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn) {
-	/* create an iommu rmap for a single page if it 
+	/*
+	 * create an iommu rmap for a single page if it 
 	 * doesn't already exist
 	 */
 	// struct iommu_rmap new_rmap = {.domain = domain, .iova = iova_pfn};
@@ -194,13 +195,11 @@ void alias_vunmap(void *p)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	if (!atomic_add_unless(&page_alias->kernel_ref_count, -1, 1)){
-		if(atomic_cmpxchg(&page_alias->kernel_ref_count, 1, 0))
-		{
+	if (!atomic_add_unless(&page_alias->kernel_ref_count, -1, 1)) {
+		if (atomic_cmpxchg(&page_alias->kernel_ref_count, 1, 0)) {
 			page_ext_put(page_ext); /* because vmap might sleep */
 			vunmap(p);
-		}
-		else {
+		} else {
 		/* Either someone else unmapped, or someone else added a referance. */
 			atomic_dec(&page_alias->kernel_ref_count);
 			page_ext_put(page_ext);
