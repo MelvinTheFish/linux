@@ -2278,10 +2278,14 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		}
 
 		nr_pages -= lvl_pages;
-		pr_info(" iter no . %d", i);
-		pr_info("lvl_pages = %ld\n",lvl_pages);
+		if ((i-1) % 1000 == 0){
+			pr_info(" iter no . %d", i);
+		}
+		// pr_info("lvl_pages = %ld\n",lvl_pages);
 		//create rmap
-		alias_iommu_create_rmap(&domain->domain, iov_pfn);
+		if(!domain_type_is_si(domain)){
+			alias_iommu_create_rmap(&domain->domain, iov_pfn);
+		}
 		iov_pfn += lvl_pages;
 		phys_pfn += lvl_pages;
 		pteval += lvl_pages * VTD_PAGE_SIZE;
@@ -4156,6 +4160,14 @@ static int intel_iommu_map(struct iommu_domain *domain,
 			   size_t size, int iommu_prot, gfp_t gfp)
 {
 	// pr_info("elbaz");
+	pr_info("In function %s\n", __func__);
+	pr_info("params: iommu_prot: %d\n", iommu_prot);
+
+	// int elbaz = 8;
+	// int shachmat = 8;
+	// int sad_elbaz = elbaz - shachmat;
+	// int bug = 10/sad_elbaz;
+	// pr_info("hello: %d\n", bug);
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	u64 max_addr;
 	int prot = 0;
@@ -4203,6 +4215,7 @@ static int intel_iommu_map_pages(struct iommu_domain *domain,
 	if (!IS_ALIGNED(iova | paddr, pgsize))
 		return -EINVAL;
 
+	pr_info("In function %s\n", __func__);
 	ret = intel_iommu_map(domain, iova, paddr, size, prot, gfp);
 	if (!ret && mapped)
 		*mapped = size;

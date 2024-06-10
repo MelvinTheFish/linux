@@ -423,7 +423,7 @@ static int __meminit page_ext_callback(struct notifier_block *self,
 	switch (action) {
 	case MEM_GOING_ONLINE:
 		ret = online_page_ext(mn->start_pfn,
-				   mn->nr_pages, mn->status_change_nid);
+				   mn->nr_pages, mn->status_change_nid);//
 		break;
 	case MEM_OFFLINE:
 		offline_page_ext(mn->start_pfn,

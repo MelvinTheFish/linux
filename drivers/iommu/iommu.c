@@ -2445,6 +2445,7 @@ static int __iommu_map_pages(struct iommu_domain *domain, unsigned long iova,
 static int __iommu_map(struct iommu_domain *domain, unsigned long iova,
 		       phys_addr_t paddr, size_t size, int prot, gfp_t gfp)
 {
+	pr_info("In function %s\n", __func__);
 	const struct iommu_domain_ops *ops = domain->ops;
 	unsigned long orig_iova = iova;
 	unsigned int min_pagesz;
@@ -2505,6 +2506,7 @@ static int __iommu_map(struct iommu_domain *domain, unsigned long iova,
 int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	      phys_addr_t paddr, size_t size, int prot, gfp_t gfp)
 {
+	pr_info("In function %s", __func__);
 	const struct iommu_domain_ops *ops = domain->ops;
 	int ret;
 
@@ -2616,6 +2618,7 @@ ssize_t iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 		     struct scatterlist *sg, unsigned int nents, int prot,
 		     gfp_t gfp)
 {
+	pr_info("In function %s", __func__);
 	const struct iommu_domain_ops *ops = domain->ops;
 	size_t len = 0, mapped = 0;
 	phys_addr_t start;
