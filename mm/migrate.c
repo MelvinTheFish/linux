@@ -1458,18 +1458,18 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 			goto out;
 		}
 	} else if (folio_mapped(src)) {
-                makpitz_trace("In migrate_folio_unmap, folio_mapped(src), calling try_to_migrate\n");
+        makpitz_trace("In migrate_folio_unmap, folio_mapped(src), calling try_to_migrate\n");
 		/* Establish migration ptes */
 		VM_BUG_ON_FOLIO(folio_test_anon(src) && !folio_test_ksm(src) &&
 					!anon_vma,
 				src);
 		try_to_migrate(src,
-			       mode == MIGRATE_ASYNC ? TTU_BATCH_FLUSH : 0);
+			    	mode == MIGRATE_ASYNC ? TTU_BATCH_FLUSH : 0);
 		page_was_mapped = 1;
 	}
-
+	pr_info("folio_expected_refs(mapping, folio) = %d", folio_expected_refs((struct address_space*)1, src));
 	if (!folio_mapped(src)) {
-                makpitz_trace("In migrate_folio_unmap, !folio_mapped(src), calling __migrate_folio_record\n");
+        makpitz_trace("In migrate_folio_unmap, !folio_mapped(src), calling __migrate_folio_record\n");
 		__migrate_folio_record(dst, page_was_mapped, anon_vma);
 		return MIGRATEPAGE_UNMAP;
 	}

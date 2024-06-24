@@ -2146,9 +2146,11 @@ void try_to_migrate(struct folio *folio, enum ttu_flags flags)
 	 * Migration always ignores mlock and only supports TTU_RMAP_LOCKED and
 	 * TTU_SPLIT_HUGE_PMD, TTU_SYNC, and TTU_BATCH_FLUSH flags.
 	 */
+	pr_info("in try_to_migrate, 1");
 	if (WARN_ON_ONCE(flags & ~(TTU_RMAP_LOCKED | TTU_SPLIT_HUGE_PMD |
 					TTU_SYNC | TTU_BATCH_FLUSH)))
 		return;
+	pr_info("in try_to_migrate, 2");
 
 	if (folio_is_zone_device(folio) &&
 	    (!folio_is_device_private(folio) && !folio_is_device_coherent(folio)))
@@ -2162,11 +2164,17 @@ void try_to_migrate(struct folio *folio, enum ttu_flags flags)
 	 * locking requirements of exec(), migration skips
 	 * temporary VMAs until after exec() completes.
 	 */
-	if (!folio_test_ksm(folio) && folio_test_anon(folio))
-		rwc.invalid_vma = invalid_migration_vma;
+	pr_info("in try_to_migrate, 3");
 
-	if (flags & TTU_RMAP_LOCKED)
+	if (!folio_test_ksm(folio) && folio_test_anon(folio)){
+		pr_info("in try_to_migrate, 4");
+		rwc.invalid_vma = invalid_migration_vma;
+	}
+	if (flags & TTU_RMAP_LOCKED){
 		rmap_walk_locked(folio, &rwc);
+		pr_info("in try_to_migrate, 5");
+
+	}
 	else
 		rmap_walk(folio, &rwc);
 }

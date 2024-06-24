@@ -1243,8 +1243,14 @@ static inline bool folio_large_is_mapped(struct folio *folio)
  */
 static inline bool folio_mapped(struct folio *folio)
 {
-	if (likely(!folio_test_large(folio)))
-		return atomic_read(&folio->_mapcount) >= 0;
+	int y = 0, x = 0;
+	if (likely(!folio_test_large(folio))){
+		y = atomic_read(&folio->_mapcount);
+		x = atomic_read(&folio->_refcount);
+		pr_info("at folio_mapped, folio->_mapcount = %d, folio->_refcount = %d", y, x);
+		return y >= 0;
+	}
+	
 	return folio_large_is_mapped(folio);
 }
 
