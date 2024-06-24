@@ -91,17 +91,18 @@ noinline void __set_page_alias(struct page *page)
 }
 
 
-void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn) {
+void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn) {
 	/*
 	 * create an iommu rmap for a single page if it 
 	 * doesn't already exist
 	 */
-	struct iommu_rmap new_rmap = {.domain = domain, .iova = iova_pfn};
-	struct page *page = pfn_to_page(iova_pfn);
+	pr_info("in function %s", __func__);
+	struct iommu_rmap new_rmap = {.domain = domain, .iova = phys_pfn};
+	struct page *page = pfn_to_page(phys_pfn);
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext){
-		pr_info("In function %s, page_ext is null,PFN=%lx,  but everything is chill\n", __func__,iova_pfn);
+		pr_info("In function %s, page_ext is null,PFN=%lx,  but everything is chill\n", __func__,phys_pfn);
 		return;
 	}
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
@@ -129,11 +130,11 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn
 	page_ext_put(page_ext);
 }
 
-void alias_iommu_remove_rmap(unsigned long iova_pfn) {
+void alias_iommu_remove_rmap(unsigned long phys_pfn) {
 	/* 
 	 * remove an iommu rmap for a single page 
 	 */
-	struct page *page = pfn_to_page(iova_pfn);
+	struct page *page = pfn_to_page(phys_pfn);
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
