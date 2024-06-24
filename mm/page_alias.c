@@ -101,7 +101,7 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext){
-		// pr_info("In function %s, page_ext is null, but everything is chill\n", __func__);
+		pr_info("In function %s, page_ext is null,PFN=%lx,  but everything is chill\n", __func__,iova_pfn);
 		return;
 	}
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);

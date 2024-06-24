@@ -2278,13 +2278,13 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		}
 
 		nr_pages -= lvl_pages;
-		if ((i-1) % 1000 == 0){
-			pr_info(" iter no . %d", i);
-		}
+		// if ((i-1) % 1000 == 0){
+		// 	pr_info(" iter no . %d", i);
+		// }
 		// pr_info("lvl_pages = %ld\n",lvl_pages);
 		//create rmap
 		if(!domain_type_is_si(domain)){
-			alias_iommu_create_rmap(&domain->domain, iov_pfn);
+			alias_iommu_create_rmap(&domain->domain, phys_pfn);
 		}
 		iov_pfn += lvl_pages;
 		phys_pfn += lvl_pages;
