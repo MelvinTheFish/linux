@@ -1,8 +1,8 @@
-PinMigration Project - Introducing Ability to Migrate Pinned Pages to Linux Kernel
-==================================================================================
+PinMigration Project - Introducing the Ability to Migrate Pinned Pages to Linux Kernel
+======================================================================================
 
 By Nizan Kafman-Raz and Omer Daube
 Under the guidance of Nadav Amit, Dan Tzafrir and Avidan Borisov
-Computer Science Faculty, Technion, Winter 2024
+Technion, Israel Institute of Technology, 2024
 
-Forked from torvalds/linux (v6.6)
+Forked from torvalds/linux.git (v6.6)
