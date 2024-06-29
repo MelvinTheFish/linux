@@ -75,6 +75,7 @@
 #include <linux/memremap.h>
 #include <linux/userfaultfd_k.h>
 #include <linux/mm_inline.h>
+#include <linux/page_alias.h>
 
 #include <asm/tlbflush.h>
 
@@ -2066,8 +2067,11 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 				       !anon_exclusive, subpage);
 
 			/* See page_try_share_anon_rmap(): clear PTE first. */
+			pr_info("here 1");
+			pr_info("is_alias_rmap_empty(subpage) = %d", is_alias_rmap_empty(subpage));
 			if (anon_exclusive &&
-			    page_try_share_anon_rmap(subpage)) {
+			    page_try_share_anon_rmap(subpage) && is_alias_rmap_empty(subpage)) {
+				pr_info("here 2");
 				if (folio_test_hugetlb(folio))
 					set_huge_pte_at(mm, address, pvmw.pte,
 							pteval, hsz);
@@ -2077,35 +2081,54 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 				page_vma_mapped_walk_done(&pvmw);
 				break;
 			}
-
+			pr_info("here3");
 			/*
 			 * Store the pfn of the page in a special migration
 			 * pte. do_swap_page() will wait until the migration
 			 * pte is removed and then restart fault handling.
 			 */
-			if (pte_write(pteval))
+			if (pte_write(pteval)){
+				pr_info("here5");
 				entry = make_writable_migration_entry(
 							page_to_pfn(subpage));
-			else if (anon_exclusive)
+			}
+			else if (anon_exclusive){
+				pr_info("here6");
+
 				entry = make_readable_exclusive_migration_entry(
 							page_to_pfn(subpage));
-			else
+			}
+			else{
+				pr_info("here7");
 				entry = make_readable_migration_entry(
 							page_to_pfn(subpage));
-			if (pte_young(pteval))
+			}
+			if (pte_young(pteval)){
+				pr_info("here8");
 				entry = make_migration_entry_young(entry);
-			if (pte_dirty(pteval))
+			}
+			if (pte_dirty(pteval)){
+				pr_info("here9");
 				entry = make_migration_entry_dirty(entry);
+			}
 			swp_pte = swp_entry_to_pte(entry);
-			if (pte_soft_dirty(pteval))
+			if (pte_soft_dirty(pteval)){
+				pr_info("here10");
 				swp_pte = pte_swp_mksoft_dirty(swp_pte);
-			if (pte_uffd_wp(pteval))
+			}
+			if (pte_uffd_wp(pteval)){
+				pr_info("here11");
 				swp_pte = pte_swp_mkuffd_wp(swp_pte);
-			if (folio_test_hugetlb(folio))
+			}
+			if (folio_test_hugetlb(folio)){
+				pr_info("here12");
 				set_huge_pte_at(mm, address, pvmw.pte, swp_pte,
 						hsz);
-			else
+			}
+			else{
+				pr_info("here13");
 				set_pte_at(mm, address, pvmw.pte, swp_pte);
+			}
 			trace_set_migration_pte(address, pte_val(swp_pte),
 						compound_order(&folio->page));
 			/*
@@ -2113,15 +2136,17 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 			 * against the special swap migration pte.
 			 */
 		}
-
+		pr_info("here15");
 		page_remove_rmap(subpage, vma, folio_test_hugetlb(folio));
-		if (vma->vm_flags & VM_LOCKED)
+		if (vma->vm_flags & VM_LOCKED){
+			pr_info("here16");
 			mlock_drain_local();
+		}
 		folio_put(folio);
 	}
-
+	pr_info("here17");
 	mmu_notifier_invalidate_range_end(&range);
-
+	pr_info("here18 = %d", ret);
 	return ret;
 }
 

@@ -440,6 +440,9 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 	if (!mapping) {
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
+		if (is_alias_dma_page(&folio->page)) {
+			count -= GUP_PIN_COUNTING_BIAS;
+		}
 		if (count != expected_count) {
 			makpitz_trace("ref count is wrong. expected: %d, got: %d\n",
 				expected_count, count);
@@ -729,9 +732,12 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	new_page = folio_page(newfolio, 0);
 	makpitz_trace("calling is_alias_rmap_empty in %s\n", __func__);
 	pinned = is_alias_rmap_empty(curr_page); //check if pinned
+	pr_info("is_alias_rmap_empty(subpage) = %d", is_alias_rmap_empty(curr_page));
+
 	makpitz_trace("in %s, !is_alias_rmap_empty made pinned=%d\n", __func__, pinned);
 	if (pinned)
 		return MIGRATEPAGE_SUCCESS;
+	pr_info("START PINMIG!");
 	//update flags
 	start_pinned_migration(curr_page);
 	vptr = get_alias_rmap(curr_page); //need later to make sure we do that to all references and not just one.

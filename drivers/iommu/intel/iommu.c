@@ -2284,6 +2284,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		// pr_info("lvl_pages = %ld\n",lvl_pages);
 		//create rmap
 		if(!domain_type_is_si(domain)){
+			// pr_info("the important and sanity check = %d", virt_to_kpte((long unsigned int)phys_to_virt(phys_pfn))->pte == pte);
 			alias_iommu_create_rmap(&domain->domain, phys_pfn);
 		}
 		iov_pfn += lvl_pages;

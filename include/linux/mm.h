@@ -30,6 +30,7 @@
 #include <linux/kasan.h>
 #include <linux/memremap.h>
 #include <linux/slab.h>
+// #include <linux/page_alias.h>
 
 struct mempolicy;
 struct anon_vma;
@@ -1243,13 +1244,8 @@ static inline bool folio_large_is_mapped(struct folio *folio)
  */
 static inline bool folio_mapped(struct folio *folio)
 {
-	int y = 0, x = 0;
-	if (likely(!folio_test_large(folio))){
-		y = atomic_read(&folio->_mapcount);
-		x = atomic_read(&folio->_refcount);
-		pr_info("at folio_mapped, folio->_mapcount = %d, folio->_refcount = %d", y, x);
-		return y >= 0;
-	}
+	if (likely(!folio_test_large(folio)))
+		return atomic_read(&folio->_mapcount) >= 0;
 	
 	return folio_large_is_mapped(folio);
 }
@@ -1924,6 +1920,9 @@ static inline struct folio *pfn_folio(unsigned long pfn)
  */
 static inline bool folio_maybe_dma_pinned(struct folio *folio)
 {
+	// if (!is_alias_rmap_empty(&folio->page)) {
+	// 	pr_info("i was right");
+	// }
 	if (folio_test_large(folio))
 		return atomic_read(&folio->_pincount) > 0;
 
@@ -1935,6 +1934,7 @@ static inline bool folio_maybe_dma_pinned(struct folio *folio)
 	 * Here, for that overflow case, use the sign bit to count a little
 	 * bit higher via unsigned math, and thus still get an accurate result.
 	 */
+	
 	return ((unsigned int)folio_ref_count(folio)) >=
 		GUP_PIN_COUNTING_BIAS;
 }
