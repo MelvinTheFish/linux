@@ -742,7 +742,7 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	start_pinned_migration(curr_page);
 	vptr = get_alias_rmap(curr_page); //need later to make sure we do that to all references and not just one.
 	/*start iterating, later do:
-	if (!pte_present(old_pte)) 
+	if (!pte_present(old_pte))
         return true; */
 	curr_pte = virt_to_kpte((unsigned long)vptr);
 	old_pte = *curr_pte;
@@ -1142,6 +1142,7 @@ static int fallback_migrate_folio(struct address_space *mapping,
 static int move_to_new_folio(struct folio *dst, struct folio *src,
 			     enum migrate_mode mode)
 {
+	makpitz_trace("In %s\n", __func__);
 	int rc = -EAGAIN;
 	bool is_lru = !__PageMovable(&src->page);
 
@@ -1185,7 +1186,7 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 			folio_clear_isolated(src);
 			goto out;
 		}
-
+		makpitz_trace("In %s, calling migrate_page()", __func__);
 		mops = folio_movable_ops(src);
 		rc = mops->migrate_page(&dst->page, &src->page, mode);
 		WARN_ON_ONCE(rc == MIGRATEPAGE_SUCCESS &&
@@ -1315,7 +1316,7 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 			       enum migrate_reason reason,
 			       struct list_head *ret)
 {
-        makpitz_trace("in migrate_folio_unmap, mode=%d and nizan is hungry\n", mode);
+        makpitz_trace("In %s, mode=%d and nizan is hungry\n", __func__, mode);
 	struct folio *dst;
 	int rc = -EAGAIN;
 	int page_was_mapped = 0;
@@ -1474,7 +1475,7 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 		page_was_mapped = 1;
 	}
 	pr_info("folio_expected_refs(mapping, folio) = %d", folio_expected_refs((struct address_space*)1, src));
-	if (!folio_mapped(src)) {
+	if (!folio_mapped(src)) { //true if it's not referenced by user page tables
         makpitz_trace("In migrate_folio_unmap, !folio_mapped(src), calling __migrate_folio_record\n");
 		__migrate_folio_record(dst, page_was_mapped, anon_vma);
 		return MIGRATEPAGE_UNMAP;

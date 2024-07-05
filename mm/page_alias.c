@@ -96,7 +96,7 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn
 	 * create an iommu rmap for a single page if it 
 	 * doesn't already exist
 	 */
-	pr_info("in function %s", __func__);
+	// pr_info("in function %s", __func__);
 	struct iommu_rmap new_rmap = {.domain = domain, .phys_pfn = phys_pfn};
 	struct page *page = pfn_to_page(phys_pfn);
 	BUG_ON(!page);
@@ -245,11 +245,13 @@ int get_alias_refcount(struct page *page)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	int i = atomic_read(&(
-		page_alias->kernel_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
+	int i = atomic_read(&(page_alias->kernel_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
+	int j = atomic_read(&(page_alias->iommu_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
 	page_ext_put(page_ext);
-	pr_info("refcount: %d", i);
-	return i;
+	pr_info("kernel refcounts: %d, iommu: %d", i, j);
+	//TODO: what about iommu references? maybe our iommu reference doesnt count because we hold the physicak address and not a pointer to the virtual one.
+	// so no need to return + j
+	return i;//
 }
 
 int is_alias_rmap_empty(struct page *page)
@@ -278,13 +280,19 @@ void *get_alias_rmap(struct page *page)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
-	void* ret; 
-	if (page_alias->kernel_rmap)
+	void* ret;
+	int i = atomic_read(&(page_alias->iommu_ref_count)); //for debug, remove later
+	if((page_alias->kernel_rmap) && (i)){
+		pr_info("both kernel and iommu rmaps!\n");
+	}
+	if (page_alias->kernel_rmap){
+		pr_info("kernel_rmap\n");
 		ret = page_alias->kernel_rmap;
+	}
 	else{ //iommu
-		pr_info("at least we are here");
+		pr_info("iommu_rmap\n");
 		//pfn_to_dma_pte
-		ret = phys_to_virt(page_alias->iommu_rmap.phys_pfn);
+		ret = phys_to_virt(page_alias->iommu_rmap.phys_pfn); //not sure if this is good, because it's a kernel's address
 	}
 	page_ext_put(page_ext);
 	return ret;

@@ -39,6 +39,25 @@
 #include "iommu-sva.h"
 #include "iommu-priv.h"
 
+#define DAUBE_TRACE 0 // Change this to 0 to disable debugging
+
+// Conditional Debugging Macro
+#if DAUBE_TRACE
+#define makpitz_trace(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define makpitz_trace(fmt, ...)
+#endif
+
+
+#define DAUBE_DBG 1 // Change this to 0 to disable debugging
+
+// Conditional Debugging Macro
+#if DAUBE_DBG
+#define makpitz_dbg(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define makpitz_dbg(fmt, ...)
+#endif
+
 static struct kset *iommu_group_kset;
 static DEFINE_IDA(iommu_group_ida);
 static DEFINE_IDA(iommu_global_pasid_ida);
@@ -2445,7 +2464,7 @@ static int __iommu_map_pages(struct iommu_domain *domain, unsigned long iova,
 static int __iommu_map(struct iommu_domain *domain, unsigned long iova,
 		       phys_addr_t paddr, size_t size, int prot, gfp_t gfp)
 {
-	pr_info("In function %s\n", __func__);
+	makpitz_trace("In function %s\n", __func__);
 	const struct iommu_domain_ops *ops = domain->ops;
 	unsigned long orig_iova = iova;
 	unsigned int min_pagesz;
@@ -2506,7 +2525,7 @@ static int __iommu_map(struct iommu_domain *domain, unsigned long iova,
 int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	      phys_addr_t paddr, size_t size, int prot, gfp_t gfp)
 {
-	pr_info("In function %s", __func__);
+	makpitz_trace("In function %s", __func__);
 	const struct iommu_domain_ops *ops = domain->ops;
 	int ret;
 
@@ -2618,7 +2637,7 @@ ssize_t iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 		     struct scatterlist *sg, unsigned int nents, int prot,
 		     gfp_t gfp)
 {
-	pr_info("In function %s", __func__);
+	makpitz_trace("In function %s", __func__);
 	const struct iommu_domain_ops *ops = domain->ops;
 	size_t len = 0, mapped = 0;
 	phys_addr_t start;

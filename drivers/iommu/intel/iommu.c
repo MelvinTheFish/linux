@@ -358,7 +358,7 @@ static int __init intel_iommu_setup(char *str)
 			pr_info("Scalable mode is disallowed\n");
 			intel_iommu_sm = 0;
 		} else if (!strncmp(str, "tboot_noforce", 13)) {
-			pr_info("Intel-IOMMU: not forcing on after tboot. This could expose security risk for tboot\n");
+			//pr_info("Intel-IOMMU: not forcing on after tboot. This could expose security risk for tboot\n");
 			intel_iommu_tboot_noforce = 1;
 		} else {
 			pr_notice("Unknown option - '%s'\n", str);
@@ -3742,7 +3742,7 @@ static int __init platform_optin_force_iommu(void)
 		return 0;
 
 	if (no_iommu || dmar_disabled)
-		pr_info("Intel-IOMMU force enabled due to platform opt in\n");
+		//pr_info("Intel-IOMMU force enabled due to platform opt in\n");
 
 	/*
 	 * If Intel-IOMMU is disabled by default, we will apply identity
@@ -3929,7 +3929,7 @@ int __init intel_iommu_init(void)
 	}
 	up_read(&dmar_global_lock);
 
-	pr_info("Intel(R) Virtualization Technology for Directed I/O\n");
+	//pr_info("Intel(R) Virtualization Technology for Directed I/O\n");
 
 	intel_iommu_enabled = 1;
 
@@ -4161,8 +4161,8 @@ static int intel_iommu_map(struct iommu_domain *domain,
 			   size_t size, int iommu_prot, gfp_t gfp)
 {
 	// pr_info("elbaz");
-	pr_info("In function %s\n", __func__);
-	pr_info("params: iommu_prot: %d\n", iommu_prot);
+	// //pr_info("In function %s\n", __func__);
+	// pr_info("params: iommu_prot: %d\n", iommu_prot);
 
 	// int elbaz = 8;
 	// int shachmat = 8;
@@ -4216,7 +4216,7 @@ static int intel_iommu_map_pages(struct iommu_domain *domain,
 	if (!IS_ALIGNED(iova | paddr, pgsize))
 		return -EINVAL;
 
-	pr_info("In function %s\n", __func__);
+	//pr_info("In function %s\n", __func__);
 	ret = intel_iommu_map(domain, iova, paddr, size, prot, gfp);
 	if (!ret && mapped)
 		*mapped = size;
@@ -4835,6 +4835,7 @@ static void *intel_iommu_hw_info(struct device *dev, u32 *length, u32 *type)
 
 static int intel_migrate_page(struct iommu_domain *domain, unsigned long iova, bool prepare)
 {
+	pr_info("In %s###################################################################", __func__);
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	struct iommu_domain_info *info;
 	unsigned long pfn = iova >> VTD_PAGE_SHIFT;
