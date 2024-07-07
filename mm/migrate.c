@@ -798,8 +798,10 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	}
 	folio_copy(newfolio, folio);
 	if (pinned){
-		if (kernel_pinned && kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
-			return -EPINMIGF;//should by Ebusy
+		if (kernel_pinned){
+			if(kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
+				return -EPINMIGF;//should by Ebusy
+		}
 		else
 			call_dma_migrate_page(page, false, newfolio); // false for not prepare, should also include return value later
 	}
