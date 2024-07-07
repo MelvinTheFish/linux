@@ -4833,12 +4833,12 @@ static void *intel_iommu_hw_info(struct device *dev, u32 *length, u32 *type)
 	return vtd;
 }
 
-static int intel_migrate_page(struct iommu_domain *domain, unsigned long iova, bool prepare)
+static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, struct folio new_folio, bool prepare)
 {
 	pr_info("In %s###################################################################", __func__);
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	struct iommu_domain_info *info;
-	unsigned long pfn = iova >> VTD_PAGE_SHIFT;
+
 	unsigned long i;
 	int level = 1;
 	struct dma_pte *ptep, pte, new_pte; 
@@ -4872,7 +4872,8 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long iova, b
 
 	new_pte = pte;
 	new_pte.val &= ~VTD_PAGE_MASK;
-	new_pte.val |= pfn << VTD_PAGE_SHIFT;
+	unsigned long new_pfn = page_to_dma_pfn(&new_folio->page);
+	new_pte.val |= new_pfn << VTD_PAGE_SHIFT;
 
 	/* If the access bit is clean we would not need a TLB flush */
 	return try_cmpxchg64(&ptep->val, &pte.val, new_pte.val);
