@@ -44,6 +44,7 @@ struct page_alias {
 	atomic_t iommu_ref_count;
 	void* kernel_rmap;
 	struct iommu_rmap iommu_rmap;
+	// bit_who_is_the_owner
 };
 
 static inline struct page_alias *get_page_alias(struct page_ext *page_ext)
@@ -275,6 +276,18 @@ int is_alias_dma_page(struct page *page){
 	return ret;
 }
 
+
+
+int is_alias_kernel_page(struct page *page){
+	/* returns 1 if kernel pinned, else 0 */
+	struct page_ext *page_ext = page_ext_get(page);
+	struct page_alias *page_alias =
+		page_ext_data(page_ext, &page_alias_ops);
+	int ret = !!(page_alias->kernel_rmap);
+	page_ext_put(page_ext);
+	return ret;
+}
+
 void *get_alias_rmap(struct page *page)
 {
 	struct page_ext *page_ext = page_ext_get(page);
@@ -313,5 +326,14 @@ void end_pinned_migration(struct page *page){
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
 	atomic_set(&page_alias->do_not_move, 0);
+	page_ext_put(page_ext);
+}
+
+void call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio){
+	struct page_ext *page_ext = page_ext_get(page);
+	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
+	struct iommu_rmap iommu_rmap = page_alias->iommu_rmap;
+	struct iommu_domain* domain = iommu_rmap.domain;
+	domain->ops->migrate_page(domain, iommu_rmap.phys_pfn, folio, prepare);
 	page_ext_put(page_ext);
 }

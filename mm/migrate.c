@@ -780,20 +780,29 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
     makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
-	int pinned;
+	int pinned, dma_pinned, kernel_pinned;
 	makpitz_dbg("calling is_alias_rmap_empty in %s\n", __func__);
-	pinned = (!is_alias_rmap_empty(page));
+	dma_pinned = is_alias_dma_page(page);
+	kernel_pinned = is_alias_kernel_page(page);
+	pinned = (dma_pinned || kernel_pinned);
 	if (pinned){
 		makpitz_dbg("handling a pinned page\n");
 	}
 	else
 		makpitz_dbg("handling a non-pinned page\n");
-	if (pinned)
-		kernel_migrate_pinned_page_prepare(folio);
+	if (pinned){
+		if(kernel_pinned)
+			kernel_migrate_pinned_page_prepare(folio);
+		else
+			call_dma_migrate_page(page, true, NULL);
+	}
 	folio_copy(newfolio, folio);
-	
-	if (pinned && kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
-		return -EPINMIGF;//should by Ebusy
+	if (pinned){
+		if (kernel_pinned && kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
+			return -EPINMIGF;//should by Ebusy
+		else
+			call_dma_migrate_page(page, false, newfolio); // false for not prepare, should also include return value later
+	}
 	folio_migrate_flags(newfolio, folio);
 	return MIGRATEPAGE_SUCCESS;
 }
@@ -1145,7 +1154,7 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 	makpitz_trace("In %s\n", __func__);
 	int rc = -EAGAIN;
 	bool is_lru = !__PageMovable(&src->page);
-
+	// bool iommu_pin = is_alias_dma_page(&src->page);
 	VM_BUG_ON_FOLIO(!folio_test_locked(src), src);
 	VM_BUG_ON_FOLIO(!folio_test_locked(dst), dst);
 
@@ -1182,6 +1191,7 @@ static int move_to_new_folio(struct folio *dst, struct folio *src,
 		 */
 		VM_BUG_ON_FOLIO(!folio_test_isolated(src), src);
 		if (!folio_test_movable(src)) {
+			makpitz_dbg("In %s, folio not movable!", __func__);
 			rc = MIGRATEPAGE_SUCCESS;
 			folio_clear_isolated(src);
 			goto out;

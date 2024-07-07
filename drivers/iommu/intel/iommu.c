@@ -4833,7 +4833,7 @@ static void *intel_iommu_hw_info(struct device *dev, u32 *length, u32 *type)
 	return vtd;
 }
 
-static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, struct folio new_folio, bool prepare)
+static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, struct folio *new_folio, bool prepare)
 {
 	pr_info("In %s###################################################################", __func__);
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);

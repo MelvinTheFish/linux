@@ -343,8 +343,7 @@ struct iommu_domain_ops {
 	size_t (*unmap_pages)(struct iommu_domain *domain, unsigned long iova,
 			      size_t pgsize, size_t pgcount,
 			      struct iommu_iotlb_gather *iotlb_gather);
-	int (*migrate_page)(struct iommu_domain *domain, unsigned long iova,
-			    bool prepare);
+	int (*migrate_page)(struct iommu_domain *domain, unsigned long pfn, struct folio *new_folio, bool prepare);
 	void (*flush_iotlb_all)(struct iommu_domain *domain);
 	void (*iotlb_sync_map)(struct iommu_domain *domain, unsigned long iova,
 			       size_t size);
