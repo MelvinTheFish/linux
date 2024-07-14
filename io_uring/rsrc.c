@@ -672,6 +672,7 @@ int io_queue_rsrc_removal(struct io_rsrc_data *data, unsigned idx, void *rsrc)
 
 void __io_sqe_files_unregister(struct io_ring_ctx *ctx)
 {
+	pr_info("in %s", __func__);
 	int i;
 
 	for (i = 0; i < ctx->nr_user_files; i++) {
@@ -702,6 +703,7 @@ void __io_sqe_files_unregister(struct io_ring_ctx *ctx)
 
 int io_sqe_files_unregister(struct io_ring_ctx *ctx)
 {
+	pr_info("in %s", __func__);
 	unsigned nr = ctx->nr_user_files;
 	int ret;
 
@@ -993,9 +995,9 @@ static bool headpage_already_acct(struct io_ring_ctx *ctx, struct page **pages,
 		struct io_mapped_ubuf *imu = ctx->user_bufs[i];
 
 		for (j = 0; j < imu->nr_kvecs; j++) {
-			if (!PageCompound(virt_to_page(imu->kvec[j].iov_base)))
+			if (!PageCompound(alias_vmap_to_page(imu->kvec[j].iov_base)))
 				continue;
-			if (compound_head(virt_to_page(imu->kvec[j].iov_base)) == hpage)
+			if (compound_head(alias_vmap_to_page(imu->kvec[j].iov_base)) == hpage)
 				return true;
 		}
 	}
