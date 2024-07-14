@@ -441,7 +441,8 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
 		if (is_alias_dma_page(&folio->page)) {
-			count -= GUP_PIN_COUNTING_BIAS;
+			if (count >= GUP_PIN_COUNTING_BIAS)
+				count -= GUP_PIN_COUNTING_BIAS;
 		}
 		if (count != expected_count) {
 			makpitz_trace("ref count is wrong. expected: %d, got: %d\n",

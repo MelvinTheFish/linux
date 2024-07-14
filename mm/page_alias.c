@@ -100,7 +100,7 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn
 	// pr_info("in function %s", __func__);
 	struct iommu_rmap new_rmap = {.domain = domain, .phys_pfn = phys_pfn};
 	struct page *page = pfn_to_page(phys_pfn);
-	pr_info("the page in alias_iommu_create_rmap in = %ld\n", (unsigned long)&page);
+	// pr_info("the page in alias_iommu_create_rmap in = %ld\n", (unsigned long)&page);
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext){

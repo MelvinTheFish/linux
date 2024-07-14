@@ -2240,7 +2240,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 					phys_pfn, nr_pages);
 
 			pte = pfn_to_dma_pte(domain, iov_pfn, &largepage_lvl, gfp);
-			pr_info("))))))))))))%d)))))))))))))))))))))\n",dma_pte_present(pte));
+			// pr_info("))))))))))))%d)))))))))))))))))))))\n",dma_pte_present(pte));
 			if (!pte)
 				return -ENOMEM;
 			first_pte = pte;
@@ -4849,14 +4849,14 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 		return -EINVAL;
 	}
 	pte = READ_ONCE(*ptep);
-	if (!dma_pte_present(&pte)){// || !dma_pte_write(&pte)) 
-		pr_info("here2\n");
-		return 0;
-	}
-	if (!dmar_domain->migration_supported){
-		pr_info("here3\n");
-		return -EINVAL;
-	}
+	// if (!dma_pte_present(&pte)){// || !dma_pte_write(&pte)) 
+	// 	pr_info("here2\n");
+	// 	return 0;
+	// }
+	// if (!dmar_domain->migration_supported){
+	// 	pr_info("here3\n");
+	// 	return -EINVAL;
+	// }
 	first_level = dmar_domain->use_first_level;
 	dirty = dma_pte_dirty(&pte, first_level);
 	young = dma_pte_young(&pte, first_level);
@@ -4878,15 +4878,15 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 
 	new_pte = pte;
 	new_pte.val &= ~VTD_PAGE_MASK;
-	unsigned long new_pfn = page_to_dma_pfn(&new_folio->page);
+	unsigned long new_pfn = page_to_dma_pfn(&new_folio->page); // w/o dma
 	new_pte.val |= new_pfn << VTD_PAGE_SHIFT;
     struct page *new_page = folio_page(new_folio, 0);
     __set_page_alias(new_page);
-	pr_info("the page in intel_migrate_page in = %ld\n", (unsigned long)&new_page);
+	// pr_info("the page in intel_migrate_page in = %ld\n", (unsigned long)&new_page);
 
     alias_iommu_create_rmap(domain, new_pfn);
     // alias_vmap(new_page);
-    folio_ref_add(new_folio, 1);
+    // folio_ref_add(new_folio, 1);
 
 	/* If the access bit is clean we would not need a TLB flush */
 	return try_cmpxchg64(&ptep->val, &pte.val, new_pte.val);
