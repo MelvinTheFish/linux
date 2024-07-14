@@ -2240,7 +2240,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 					phys_pfn, nr_pages);
 
 			pte = pfn_to_dma_pte(domain, iov_pfn, &largepage_lvl, gfp);
-			pr_info("))))))))))))%d)))))))))))))))))))))\n",dma_pte_present(pte));
+			// pr_info("))))))))))))%d)))))))))))))))))))))\n",dma_pte_present(pte));
 			if (!pte)
 				return -ENOMEM;
 			first_pte = pte;
@@ -4890,7 +4890,7 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 
 	/* If the access bit is clean we would not need a TLB flush */
 	return try_cmpxchg64(&ptep->val, &pte.val, new_pte.val);
-} 
+}
 
 const struct iommu_ops intel_iommu_ops = {
 	.capable		= intel_iommu_capable,

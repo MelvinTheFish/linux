@@ -59,7 +59,7 @@
 
 #include "internal.h"
 
-#define DAUBE_TRACE 1 // Change this to 0 to disable debugging
+#define DAUBE_TRACE 0 // Change this to 0 to disable debugging
 
 // Conditional Debugging Macro
 #if DAUBE_TRACE
@@ -69,7 +69,7 @@
 #endif
 
 
-#define DAUBE_DBG 1 // Change this to 0 to disable debugging
+#define DAUBE_DBG 0 // Change this to 0 to disable debugging
 
 // Conditional Debugging Macro
 #if DAUBE_DBG
@@ -1486,7 +1486,7 @@ static int migrate_folio_unmap(new_folio_t get_new_folio,
 			    	mode == MIGRATE_ASYNC ? TTU_BATCH_FLUSH : 0);
 		page_was_mapped = 1;
 	}
-	pr_info("folio_expected_refs(mapping, folio) = %d", folio_expected_refs((struct address_space*)1, src));
+	makpitz_dbg("folio_expected_refs(mapping, folio) = %d", folio_expected_refs((struct address_space*)1, src));
 	if (!folio_mapped(src)) { //true if it's not referenced by user page tables
         makpitz_trace("In migrate_folio_unmap, !folio_mapped(src), calling __migrate_folio_record\n");
 		__migrate_folio_record(dst, page_was_mapped, anon_vma);

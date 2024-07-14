@@ -100,7 +100,7 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn
 	// pr_info("in function %s", __func__);
 	struct iommu_rmap new_rmap = {.domain = domain, .phys_pfn = phys_pfn};
 	struct page *page = pfn_to_page(phys_pfn);
-	pr_info("the page in alias_iommu_create_rmap in = %ld\n", (unsigned long)&page);
+	// pr_info("the page in alias_iommu_create_rmap in = %ld\n", (unsigned long)&page);
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext){
@@ -250,7 +250,7 @@ int get_alias_refcount(struct page *page)
 	int i = atomic_read(&(page_alias->kernel_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
 	int j = atomic_read(&(page_alias->iommu_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
 	page_ext_put(page_ext);
-	pr_info("kernel refcounts: %d, iommu: %d", i, j);
+	// pr_info("kernel refcounts: %d, iommu: %d", i, j);
 	//TODO: what about iommu references? maybe our iommu reference doesnt count because we hold the physicak address and not a pointer to the virtual one.
 	// so no need to return + j
 	return i;//
