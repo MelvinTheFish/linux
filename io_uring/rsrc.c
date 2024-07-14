@@ -9,7 +9,7 @@
 #include <linux/hugetlb.h>
 #include <linux/compat.h>
 #include <linux/io_uring.h>
-
+#include <linux/page_alias.h>
 #include <uapi/linux/io_uring.h>
 
 #include "io_uring.h"
@@ -140,7 +140,7 @@ static void io_buffer_unmap(struct io_ring_ctx *ctx, struct io_mapped_ubuf **slo
 
 	if (imu != &dummy_ubuf) {
 		for (i = 0; i < imu->nr_kvecs; i++){
-			unpin_user_page(virt_to_page(imu->kvec[i].iov_base));
+			unpin_user_page(alias_vmap_to_page(imu->kvec[i].iov_base));
 			//kunmap
 		}
 		if (imu->acct_pages)
@@ -1146,7 +1146,8 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 
 	if (folio) {
 		// bvec_set_page(&imu->bvec[0], pages[0], size, off);
-		imu->kvec[0].iov_base = kmap(pages[0]) + off;
+		// imu->kvec[0].iov_base = kmap(pages[0]) + off;
+		imu->kvec[0].iov_base = alias_vmap(pages[0]) + off;
 		imu->kvec[0].iov_len = size;
 		goto done;
 	}
@@ -1155,7 +1156,7 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 
 		vec_len = min_t(size_t, size, PAGE_SIZE - off);
 		// bvec_set_page(&imu->bvec[i], pages[i], vec_len, off);
-		imu->kvec[i].iov_base = kmap(pages[i]) + off;
+		imu->kvec[i].iov_base = alias_vmap(pages[i]) + off;
 		imu->kvec[i].iov_len = vec_len;
 		off = 0;
 		size -= vec_len;

@@ -407,8 +407,9 @@ static int folio_expected_refs(struct address_space *mapping,
 			       struct folio *folio)
 {
 	int refs = 1;
-	refs += get_alias_refcount(folio_page(folio, 0));//is this a race?
-
+	if(!is_alias_dma_page(&folio->page))
+		refs += get_alias_refcount(folio_page(folio, 0));//is this a race?
+ 
 	if (!mapping)
 		return refs;
 
@@ -722,7 +723,7 @@ void kernel_migrate_pinned_page_prepare(struct folio *folio)
 
 int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *folio)
 {
-    makpitz_trace("In %s\n", __func__);
+	makpitz_trace("In %s\n", __func__);
 	struct page *curr_page, *new_page;
 	void *vptr;
 	pte_t *curr_pte, new_pte, old_pte;
@@ -733,7 +734,7 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	new_page = folio_page(newfolio, 0);
 	makpitz_trace("calling is_alias_rmap_empty in %s\n", __func__);
 	pinned = is_alias_rmap_empty(curr_page); //check if pinned
-	pr_info("is_alias_rmap_empty(subpage) = %d", is_alias_rmap_empty(curr_page));
+	makpitz_dbg("is_alias_rmap_empty(subpage) = %d", is_alias_rmap_empty(curr_page));
 
 	makpitz_trace("in %s, !is_alias_rmap_empty made pinned=%d\n", __func__, pinned);
 	if (pinned)
@@ -794,7 +795,7 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	if (pinned){
 		if(kernel_pinned)
 			kernel_migrate_pinned_page_prepare(folio);
-		else
+		if(dma_pinned)
 			call_dma_migrate_page(page, true, NULL);
 	}
 	folio_copy(newfolio, folio);
@@ -803,7 +804,7 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 			if(kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
 				return -EPINMIGF;//should by Ebusy
 		}
-		else
+		if(dma_pinned)
 			call_dma_migrate_page(page, false, newfolio); // false for not prepare, should also include return value later
 	}
 	folio_migrate_flags(newfolio, folio);
