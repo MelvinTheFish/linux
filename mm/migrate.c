@@ -54,6 +54,10 @@
 #include <asm/tlbflush.h>
 
 #include <trace/events/migrate.h>
+// #include <trace/events/pinmig.h>
+
+// #define CREATE_TRACE_POINTS
+// DEFINE_TRACE(pinmig_pfn);
 
 #include <linux/page_alias.h>
 
@@ -781,6 +785,7 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
     makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
+	trace_pinmig_pfn((unsigned long)page_to_pfn(page));
 	int pinned, dma_pinned, kernel_pinned;
 	makpitz_dbg("calling is_alias_rmap_empty in %s\n", __func__);
 	dma_pinned = is_alias_dma_page(page);
