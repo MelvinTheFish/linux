@@ -716,7 +716,7 @@ void kernel_migrate_pinned_page_prepare(struct folio *folio, bool dma_pinned)
 	//should flush tlb first so if someone will access we will see it 
 	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
 	curr_pte = *vpte;
-	if (!dma_pinned)
+	if (dma_pinned)
 		return;
 	//clear the bit = from now on, we can see if someone will access the page
 	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&curr_pte.pte);
