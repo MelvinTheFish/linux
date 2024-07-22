@@ -672,6 +672,7 @@ int io_queue_rsrc_removal(struct io_rsrc_data *data, unsigned idx, void *rsrc)
 
 void __io_sqe_files_unregister(struct io_ring_ctx *ctx)
 {
+	pr_info("in %s", __func__);
 	int i;
 
 	for (i = 0; i < ctx->nr_user_files; i++) {
@@ -702,6 +703,7 @@ void __io_sqe_files_unregister(struct io_ring_ctx *ctx)
 
 int io_sqe_files_unregister(struct io_ring_ctx *ctx)
 {
+	pr_info("in %s", __func__);
 	unsigned nr = ctx->nr_user_files;
 	int ret;
 

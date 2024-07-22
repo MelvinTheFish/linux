@@ -789,9 +789,8 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	dma_pinned = is_alias_dma_page(page);
 	kernel_pinned = is_alias_kernel_page(page);
 	pinned = (dma_pinned || kernel_pinned);
-	if (pinned){
+	if (pinned)
 		makpitz_dbg("handling a pinned page\n");
-	}
 	else
 		makpitz_dbg("handling a non-pinned page\n");
 	if (pinned) {
