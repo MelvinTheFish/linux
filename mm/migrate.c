@@ -407,8 +407,8 @@ static int folio_expected_refs(struct address_space *mapping,
 			       struct folio *folio)
 {
 	int refs = 1;
-	if(!is_alias_dma_page(&folio->page))
-		refs += get_alias_refcount(folio_page(folio, 0));//is this a race?
+	// if(!is_alias_dma_page(&folio->page))
+	refs += get_alias_refcount(folio_page(folio, 0));//is this a race?
  
 	if (!mapping)
 		return refs;
@@ -441,10 +441,10 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 	if (!mapping) {
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
-		if (is_alias_dma_page(&folio->page)) {
-			if (count >= GUP_PIN_COUNTING_BIAS)
-				count -= GUP_PIN_COUNTING_BIAS;
-		}
+		// if (is_alias_dma_page(&folio->page)) {
+		while (count >= GUP_PIN_COUNTING_BIAS)
+			count -= (GUP_PIN_COUNTING_BIAS - 1);
+		// }
 		if (count != expected_count) {
 			makpitz_trace("ref count is wrong. expected: %d, got: %d\n",
 				expected_count, count);

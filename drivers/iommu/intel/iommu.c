@@ -67,7 +67,7 @@
 /* page table handling */
 #define LEVEL_STRIDE		(9)
 #define LEVEL_MASK		(((u64)1 << LEVEL_STRIDE) - 1)
-
+static phys_addr_t intel_iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
 static inline int agaw_to_level(int agaw)
 {
 	return agaw + 2;
@@ -4160,15 +4160,7 @@ static int intel_iommu_map(struct iommu_domain *domain,
 			   unsigned long iova, phys_addr_t hpa,
 			   size_t size, int iommu_prot, gfp_t gfp)
 {
-	// pr_info("elbaz");
-	// //pr_info("In function %s\n", __func__);
-	// pr_info("params: iommu_prot: %d\n", iommu_prot);
 
-	// int elbaz = 8;
-	// int shachmat = 8;
-	// int sad_elbaz = elbaz - shachmat;
-	// int bug = 10/sad_elbaz;
-	// pr_info("hello: %d\n", bug);
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	u64 max_addr;
 	int prot = 0;
@@ -4194,6 +4186,7 @@ static int intel_iommu_map(struct iommu_domain *domain,
 		}
 		dmar_domain->max_addr = max_addr;
 	}
+	// pr_info("is iova equls: %llX, %llX\n", hpa, intel_iommu_iova_to_phys(domain, iova));
 	/* Round up size to next multiple of PAGE_SIZE, if it and
 	   the low bits of hpa would take us onto the next page */
 	size = aligned_nrpages(hpa, size);
@@ -4228,10 +4221,14 @@ static size_t intel_iommu_unmap(struct iommu_domain *domain,
 				unsigned long iova, size_t size,
 				struct iommu_iotlb_gather *gather)
 {
+	unsigned long phys_pfn = intel_iommu_iova_to_phys(domain, iova) >> VTD_PAGE_SHIFT;
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	unsigned long start_pfn, last_pfn;
 	int level = 0;
 
+	alias_iommu_free_rmap(phys_pfn);
+	// pr_info("closed iommu alias");
+	
 	/* Cope with horrid API which requires us to unmap more than the
 	   size argument if it happens to be a large-page mapping. */
 	if (unlikely(!pfn_to_dma_pte(dmar_domain, iova >> VTD_PAGE_SHIFT,
@@ -4885,6 +4882,8 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 	// pr_info("the page in intel_migrate_page in = %ld\n", (unsigned long)&new_page);
 
     alias_iommu_create_rmap(domain, new_pfn);
+	// pr_info("opened iommu alias");
+
     // alias_vmap(new_page);
     // folio_ref_add(new_folio, 1);
 

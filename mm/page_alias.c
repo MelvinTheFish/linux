@@ -339,3 +339,20 @@ int call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio){
 	page_ext_put(page_ext);
 	return ret;
 }
+
+void alias_iommu_free_rmap(unsigned long phys_pfn){
+	struct page *page;
+	struct page_ext *page_ext;
+	struct page_alias *page_alias;
+
+	page = pfn_to_page(phys_pfn);
+	BUG_ON(!page);
+	page_ext = page_ext_get(page);
+	BUG_ON(!page_ext);
+	page_alias = page_ext_data(page_ext, &page_alias_ops);
+
+	atomic_set(&page_alias->iommu_ref_count, 0);
+	page_alias->iommu_rmap = empty_rmap;
+
+	page_ext_put(page_ext);
+}
