@@ -22,7 +22,7 @@ void alias_iommu_remove_rmap(unsigned long iova_pfn);
 void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long iova_pfn);
 // void set_do_not_move(struct page *page, int i);
 int is_alias_dma_page(struct page *page);
-void call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio);
+int call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio);
 int is_alias_kernel_page(struct page *page);
 
 static inline void set_page_alias(struct page *page)

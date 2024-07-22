@@ -330,11 +330,12 @@ void end_pinned_migration(struct page *page){
 	page_ext_put(page_ext);
 }
 
-void call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio){
+int call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio){
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
 	struct iommu_rmap iommu_rmap = page_alias->iommu_rmap;
 	struct iommu_domain* domain = iommu_rmap.domain;
-	domain->ops->migrate_page(domain, iommu_rmap.phys_pfn, folio, prepare);
+	int ret = domain->ops->migrate_page(domain, iommu_rmap.phys_pfn, folio, prepare);
 	page_ext_put(page_ext);
+	return ret;
 }
