@@ -4851,7 +4851,7 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 	pte = READ_ONCE(*ptep);
 	// if (!dma_pte_present(&pte)){// || !dma_pte_write(&pte)) 
 	// 	pr_info("here2\n");
-	// 	return 0;
+	// 	return -EINVAL;
 	// }
 	// if (!dmar_domain->migration_supported){
 	// 	pr_info("here3\n");
@@ -4889,7 +4889,9 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
     // folio_ref_add(new_folio, 1);
 
 	/* If the access bit is clean we would not need a TLB flush */
-	return try_cmpxchg64(&ptep->val, &pte.val, new_pte.val);
+	if (!try_cmpxchg64(&ptep->val, &pte.val, new_pte.val))
+		return -EPINMIGF;
+	return 0;
 } 
 
 const struct iommu_ops intel_iommu_ops = {

@@ -704,7 +704,7 @@ void clean_folio_migrate_mapping(struct folio *newfolio, struct folio *folio,
 	folio_put(newfolio); //? delete put
 }
 
-void kernel_migrate_pinned_page_prepare(struct folio *folio)
+void kernel_migrate_pinned_page_prepare(struct folio *folio, bool dma_pinned)
 {
 	//for vmsplice 
 	makpitz_trace("In %s\n", __func__);
@@ -716,12 +716,14 @@ void kernel_migrate_pinned_page_prepare(struct folio *folio)
 	//should flush tlb first so if someone will access we will see it 
 	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
 	curr_pte = *vpte;
+	if (!dma_pinned)
+		return;
 	//clear the bit = from now on, we can see if someone will access the page
 	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&curr_pte.pte);
 	WRITE_ONCE(*vpte, curr_pte);
 }
 
-int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *folio)
+int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *folio, bool dma_pinned)
 {
 	makpitz_trace("In %s\n", __func__);
 	struct page *curr_page, *new_page;
@@ -750,7 +752,7 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 	old_pte = *curr_pte;
 	young = pte_young(*curr_pte);
 	makpitz_trace("current pte's access bit: %d\n", young);
-	if (young)
+	if (young && !dma_pinned)
 		return -EPINMIGF;
 	//create pte for the new page with the flags of the old page
 	new_pte = mk_pte(new_page, pte_pgprot(old_pte));
@@ -792,20 +794,20 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	}
 	else
 		makpitz_dbg("handling a non-pinned page\n");
-	if (pinned){
-		if(kernel_pinned)
-			kernel_migrate_pinned_page_prepare(folio);
-		// if(dma_pinned)
-		// 	call_dma_migrate_page(page, true, NULL);
+	if (pinned) {
+		if (dma_pinned) 
+			call_dma_migrate_page(page, true, NULL);
+		if (kernel_pinned)
+			kernel_migrate_pinned_page_prepare(folio, dma_pinned);
 	}
 	folio_copy(newfolio, folio);
-	if (pinned){
-		if (kernel_pinned){
-			if(kernel_migrate_pinned_page_commit(newfolio, folio) != MIGRATEPAGE_SUCCESS)
-				return -EPINMIGF;//should by Ebusy
-		}
-		// if(dma_pinned)
-		// 	call_dma_migrate_page(page, false, newfolio); // false for not prepare, should also include return value later
+	if (pinned) {
+		if (dma_pinned) 
+			if (call_dma_migrate_page(page, false, newfolio) < 0)
+				return -EPINMIGF;
+		if (kernel_pinned) 
+			if (kernel_migrate_pinned_page_commit(newfolio, folio, dma_pinned) != MIGRATEPAGE_SUCCESS)
+				return -EPINMIGF;
 	}
 	folio_migrate_flags(newfolio, folio);
 	return MIGRATEPAGE_SUCCESS;
