@@ -993,9 +993,9 @@ static bool headpage_already_acct(struct io_ring_ctx *ctx, struct page **pages,
 		struct io_mapped_ubuf *imu = ctx->user_bufs[i];
 
 		for (j = 0; j < imu->nr_kvecs; j++) {
-			if (!PageCompound(virt_to_page(imu->kvec[j].iov_base)))
+			if (!PageCompound(alias_vmap_to_page(imu->kvec[j].iov_base)))
 				continue;
-			if (compound_head(virt_to_page(imu->kvec[j].iov_base)) == hpage)
+			if (compound_head(alias_vmap_to_page(imu->kvec[j].iov_base)) == hpage)
 				return true;
 		}
 	}

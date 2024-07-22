@@ -1865,24 +1865,24 @@ static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
 	const struct io_issue_def *def = &io_issue_defs[req->opcode];
 	const struct cred *creds = NULL;
 	int ret;
-
+	pr_info("here1\n");
 	if (unlikely(!io_assign_file(req, def, issue_flags)))
 		return -EBADF;
-
+	pr_info("here1\n");
 	if (unlikely((req->flags & REQ_F_CREDS) && req->creds != current_cred()))
 		creds = override_creds(req->creds);
-
+	pr_info("here1\n");
 	if (!def->audit_skip)
 		audit_uring_entry(req->opcode);
-
+	pr_info("here1\n");
 	ret = def->issue(req, issue_flags);
-
+	pr_info("here1\n");
 	if (!def->audit_skip)
 		audit_uring_exit(!ret, ret);
-
+	pr_info("here1\n");
 	if (creds)
 		revert_creds(creds);
-
+	pr_info("here1\n");
 	if (ret == IOU_OK) {
 		if (issue_flags & IO_URING_F_COMPLETE_DEFER)
 			io_req_complete_defer(req);
@@ -1890,7 +1890,7 @@ static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
 			io_req_complete_post(req, issue_flags);
 	} else if (ret != IOU_ISSUE_SKIP_COMPLETE)
 		return ret;
-
+	pr_info("here1\n");
 	/* If the op doesn't have a file, we're not polling for it */
 	if ((req->ctx->flags & IORING_SETUP_IOPOLL) && def->iopoll_queue)
 		io_iopoll_req_issued(req, issue_flags);
