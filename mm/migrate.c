@@ -54,6 +54,9 @@
 #include <asm/tlbflush.h>
 
 #include <trace/events/migrate.h>
+#include <linux/ktime.h>
+#include <linux/timekeeping.h>
+#include <linux/tracepoint.h>
 // #include <trace/events/pinmig.h>
 
 // #define CREATE_TRACE_POINTS
@@ -720,7 +723,7 @@ void kernel_migrate_pinned_page_prepare(struct folio *folio, bool dma_pinned)
 	//should flush tlb first so if someone will access we will see it 
 	flush_tlb_kernel_range((unsigned long)vptr, (unsigned long)vptr + PAGE_SIZE);
 	curr_pte = *vpte;
-	if (!dma_pinned)
+	if (dma_pinned)
 		return;
 	//clear the bit = from now on, we can see if someone will access the page
 	test_and_clear_bit(_PAGE_BIT_ACCESSED, (unsigned long *)&curr_pte.pte);
@@ -786,9 +789,14 @@ int kernel_migrate_pinned_page_commit(struct folio *newfolio, struct folio *foli
 
 int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
-    makpitz_trace("In %s\n", __func__);
+	struct timespec64 ts;
+	ktime_get_real_ts64(&ts);
+	trace_printk("Current time strating migration: %lld.%09ld seconds\n", (long long)ts.tv_sec, ts.tv_nsec);
+	makpitz_trace("In %s\n", __func__);
 	struct page *page = folio_page(folio, 0);
+
 	trace_pinmig_pfn((unsigned long)page_to_pfn(page));
+
 	int pinned, dma_pinned, kernel_pinned;
 	makpitz_dbg("calling is_alias_rmap_empty in %s\n", __func__);
 	dma_pinned = is_alias_dma_page(page);

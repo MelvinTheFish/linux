@@ -15,6 +15,11 @@
 #include <linux/spinlock.h>
 #include <xen/xen.h>
 
+#include <linux/ktime.h>
+#include <linux/timekeeping.h>
+#include <linux/tracepoint.h>
+#include <linux/delay.h>
+
 #ifdef DEBUG
 /* For development, we want to crash whenever the ring is screwed. */
 #define BAD_RING(_vq, fmt, args...)				\
@@ -66,6 +71,18 @@
 #define LAST_ADD_TIME_CHECK(vq)
 #define LAST_ADD_TIME_INVALID(vq)
 #endif
+
+static bool booted = false;
+
+static int set_after_boot(void)
+{
+	booted = true;
+	return 0;
+}
+
+late_initcall(set_after_boot);
+
+
 
 struct vring_desc_state_split {
 	void *data;			/* Data for callback. */
@@ -366,6 +383,11 @@ static struct device *vring_dma_dev(const struct vring_virtqueue *vq)
 static int vring_map_one_sg(const struct vring_virtqueue *vq, struct scatterlist *sg,
 			    enum dma_data_direction direction, dma_addr_t *addr)
 {
+			    
+	struct timespec64 ts;
+	ktime_get_real_ts64(&ts);
+	trace_printk("Current time dma_map_page: %lld.%09ld seconds\n", (long long)ts.tv_sec, ts.tv_nsec);
+
 	if (vq->premapped) {
 		*addr = sg_dma_address(sg);
 		return 0;
@@ -390,6 +412,8 @@ static int vring_map_one_sg(const struct vring_virtqueue *vq, struct scatterlist
 	*addr = dma_map_page(vring_dma_dev(vq),
 			    sg_page(sg), sg->offset, sg->length,
 			    direction);
+
+	
 
 	if (dma_mapping_error(vring_dma_dev(vq), *addr))
 		return -ENOMEM;
@@ -670,6 +694,12 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 	vq->vq.num_free -= descs_used;
 
 	/* Update free pointer */
+	if(booted)
+		udelay(500); //should really be mdelay
+	struct timespec64 ts;
+	ktime_get_real_ts64(&ts);
+	trace_printk("Current time moving the head: %lld.%09ld seconds\n", (long long)ts.tv_sec, ts.tv_nsec);
+
 	if (indirect)
 		vq->free_head = vq->split.desc_extra[head].next;
 	else
