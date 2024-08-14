@@ -19,6 +19,7 @@
 #include <linux/timekeeping.h>
 #include <linux/tracepoint.h>
 #include <linux/delay.h>
+#include <linux/debugfs.h>
 
 #ifdef DEBUG
 /* For development, we want to crash whenever the ring is screwed. */
@@ -72,16 +73,81 @@
 #define LAST_ADD_TIME_INVALID(vq)
 #endif
 
-static bool booted = false;
 
-static int set_after_boot(void)
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+static int sleep_time = 0;
+static struct dentry *dir, *file;
+
+static ssize_t sleep_time_read(struct file *filp, char __user *buffer, size_t len, loff_t *offset)
 {
-	booted = true;
-	return 0;
+    char buf[64];
+    int ret;
+
+    ret = snprintf(buf, sizeof(buf), "%d\n", sleep_time);
+    return simple_read_from_buffer(buffer, len, offset, buf, ret);
 }
 
-late_initcall(set_after_boot);
+static ssize_t sleep_time_write(struct file *filp, const char __user *buffer, size_t len, loff_t *offset)
+{
+    char buf[64];
 
+    if (len > sizeof(buf) - 1)
+        return -EINVAL;
+
+    if (copy_from_user(buf, buffer, len))
+        return -EFAULT;
+
+    buf[len] = '\0';
+    int res;
+    res = kstrtoint(buf, 10, &sleep_time); //char, base, *result
+    if (res){
+	pr_info("Failed to convert string to int in %s\n", __func__);
+	return res;
+    }
+
+    pr_info("New sleep time: %d\n", sleep_time);
+    return len;
+}
+
+static const struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .read = sleep_time_read,
+    .write = sleep_time_write,
+};
+
+int __init virtio_ring_debugfs_init(void)
+{
+    // Create the debugfs directory and file
+    dir = debugfs_create_dir("virtio_ring", NULL);
+    if (!dir) {
+        pr_err("Failed to create debugfs directory for virtio :(\n");
+        return -ENOMEM;
+    }
+
+    file = debugfs_create_file("sleep_time", 0666, dir, NULL, &fops);
+    if (!file) {
+        pr_err("Failed to create debugfs sleep_time file\n");
+        debugfs_remove(dir);
+        return -ENOMEM;
+    }
+
+    pr_info("virtio_ring debugfs interface initialized\n");
+    return 0;
+}
+
+void __exit virtio_ring_debugfs_exit(void)
+{
+    debugfs_remove(file);
+    debugfs_remove(dir);
+    pr_info("virtio_ring debugfs interface removed\n");
+}
+/* END OF OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+/* END OF OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+/* END OF OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+/* END OF OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
 
 
 struct vring_desc_state_split {
@@ -694,8 +760,7 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 	vq->vq.num_free -= descs_used;
 
 	/* Update free pointer */
-	if(booted)
-		udelay(500); //should really be mdelay
+	// udelay(5); //should really be mdelay
 	struct timespec64 ts;
 	ktime_get_real_ts64(&ts);
 	trace_printk("Current time moving the head: %lld.%09ld seconds\n", (long long)ts.tv_sec, ts.tv_nsec);

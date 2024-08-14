@@ -860,6 +860,16 @@ static struct platform_driver virtio_mmio_driver = {
 
 static int __init virtio_mmio_init(void)
 {
+	
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+	int ret;
+	ret = virtio_ring_debugfs_init();
+	if (ret){
+		pr_info("Calling virtio_ring_debugfs_init from virtio_mmio failed!!!!!!!!!");
+		return ret;
+	}
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+
 	return platform_driver_register(&virtio_mmio_driver);
 }
 
@@ -867,6 +877,9 @@ static void __exit virtio_mmio_exit(void)
 {
 	platform_driver_unregister(&virtio_mmio_driver);
 	vm_unregister_cmdline_devices();
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
+	virtio_ring_debugfs_exit();
+/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
 }
 
 module_init(virtio_mmio_init);
