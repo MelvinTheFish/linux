@@ -18,6 +18,7 @@
 #include <linux/ktime.h>
 #include <linux/timekeeping.h>
 #include <linux/tracepoint.h>
+#include <linux/tracepoint.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
 
@@ -127,7 +128,7 @@ int __init virtio_ring_debugfs_init(void)
         return -ENOMEM;
     }
 
-    file = debugfs_create_file("sleep_time", 0666, dir, NULL, &fops);
+    file = debugfs_create_file("sleep_time", 0666, dir, NULL, &fops); //sys/kernel/debug/virtio_ring/sleep_time
     if (!file) {
         pr_err("Failed to create debugfs sleep_time file\n");
         debugfs_remove(dir);
@@ -449,10 +450,13 @@ static struct device *vring_dma_dev(const struct vring_virtqueue *vq)
 static int vring_map_one_sg(const struct vring_virtqueue *vq, struct scatterlist *sg,
 			    enum dma_data_direction direction, dma_addr_t *addr)
 {
-			    
-	struct timespec64 ts;
-	ktime_get_real_ts64(&ts);
-	trace_printk("Current time dma_map_page: %lld.%09ld seconds\n", (long long)ts.tv_sec, ts.tv_nsec);
+	/* PINMIG*/
+	struct page *page;		    
+	unsigned long pfn;
+	page = sg_page(sg);
+	pfn = page_to_pfn(page);
+	trace_printk("Mapping page- PFN: %lu\n", pfn);
+
 
 	if (vq->premapped) {
 		*addr = sg_dma_address(sg);
@@ -760,10 +764,11 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 	vq->vq.num_free -= descs_used;
 
 	/* Update free pointer */
-	// udelay(5); //should really be mdelay
-	struct timespec64 ts;
-	ktime_get_real_ts64(&ts);
-	trace_printk("Current time moving the head: %lld.%09ld seconds\n", (long long)ts.tv_sec, ts.tv_nsec);
+	if (sleep_time > 0)
+		mdelay(sleep_time); //has to be delay, not sleep (pinmig)
+	// struct timespec64 ts;
+	// ktime_get_real_ts64(&ts);
+	trace_printk("Moving head\n");
 
 	if (indirect)
 		vq->free_head = vq->split.desc_extra[head].next;

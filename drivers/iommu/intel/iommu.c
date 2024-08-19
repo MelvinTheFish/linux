@@ -4842,7 +4842,7 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 	bool dirty, young, first_level; 
 	ptep = pfn_to_dma_pte(dmar_domain, pfn, &level, GFP_ATOMIC);
 	if (level != 1){
-		pr_info("here1\n");
+		// pr_info("here1\n");
 		return -EINVAL;
 	}
 	pte = READ_ONCE(*ptep);
