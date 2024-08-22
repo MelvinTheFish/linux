@@ -23,6 +23,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/tboot.h>
 #include <uapi/linux/iommufd.h>
+#include <linux/delay.h>
 
 #include "iommu.h"
 #include "../dma-iommu.h"
@@ -2285,6 +2286,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		//create rmap
 		if(!domain_type_is_si(domain)){
 			// pr_info("the important and sanity check = %d", virt_to_kpte((long unsigned int)phys_to_virt(phys_pfn))->pte == pte);
+			trace_printk("IOMMU-MAP: pfn = %lu\n", phys_pfn);
 			alias_iommu_create_rmap(&domain->domain, phys_pfn);
 		}
 		iov_pfn += lvl_pages;
@@ -2311,7 +2313,8 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 			pte = NULL;
 		}
 	}
-
+	// pr_info("happy\n");
+	// mdelay(1000);
 	return 0;
 }
 
@@ -4225,7 +4228,8 @@ static size_t intel_iommu_unmap(struct iommu_domain *domain,
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	unsigned long start_pfn, last_pfn;
 	int level = 0;
-
+	trace_printk("IOMMU-UNMAP: pfn = %lu\n", phys_pfn);
+	trace_printk("IOMMU-UNMAP: remove rmap\n");
 	alias_iommu_free_rmap(phys_pfn);
 	// pr_info("closed iommu alias");
 	
@@ -4880,7 +4884,7 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
     struct page *new_page = folio_page(new_folio, 0);
     __set_page_alias(new_page);
 	// pr_info("the page in intel_migrate_page in = %ld\n", (unsigned long)&new_page);
-
+	trace_printk("IOMMU-MAP: create rmap");
     alias_iommu_create_rmap(domain, new_pfn);
 	// pr_info("opened iommu alias");
 
