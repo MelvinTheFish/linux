@@ -253,7 +253,7 @@ int get_alias_refcount(struct page *page)
 	pr_info("refcounts: {kernel  %d, iommu: %d}", i, j);
 	//TODO: what about iommu references? maybe our iommu reference doesnt count because we hold the physicak address and not a pointer to the virtual one.
 	// so no need to return + j
-	return i;//PAY ATTENTION
+	return (i != 0) ? i : j ;//PAY ATTENTION- we are only returning j if i is zero, because then the only mapping is the iommu.
 }
 
 int is_alias_rmap_empty(struct page *page)
