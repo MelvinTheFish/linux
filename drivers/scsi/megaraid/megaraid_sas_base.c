@@ -9125,9 +9125,10 @@ megasas_aen_polling(struct work_struct *work)
 static int __init megasas_init(void)
 {
 	/* OUR CODE FOR CONTROLING SLEEP (pinmig, PINMIG)*/
-	int ret;
+	int ret, ret2;
 	ret = megasas_debugfs_init();
-	if (ret){
+	ret2 = megasas_fusion_debugfs_init(); 
+	if (ret || ret2){
 		pr_info("Calling megasas_debugfs_init from megaraid_sas_base failed!!!!!!!!!");
 		return ret;
 	}

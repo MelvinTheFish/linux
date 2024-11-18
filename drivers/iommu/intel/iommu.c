@@ -33,6 +33,68 @@
 #include "cap_audit.h"
 #include "perfmon.h"
 #include <linux/page_alias.h>
+#include <linux/debugfs.h>
+
+
+
+// pinmig - start
+
+static unsigned long curr_pfn = 0;
+static struct dentry *dir, *file;
+
+static ssize_t curr_pfn_read(struct file *filp, char __user *buffer, size_t len, loff_t *offset)
+{
+    char buf[64];
+    int ret;
+
+    ret = snprintf(buf, sizeof(buf), "%lu\n", curr_pfn);
+    return simple_read_from_buffer(buffer, len, offset, buf, ret);
+}
+
+static ssize_t curr_pfn_write(struct file *filp, const char __user *buffer, size_t len, loff_t *offset)
+{
+    return 0;
+}
+
+static const struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .read = curr_pfn_read,
+    .write = curr_pfn_write,
+};
+
+
+int __init iommu_pinmig_debugfs_init(void)
+{
+    // Create the debugfs directory and file
+    dir = debugfs_create_dir("iommu_pinmig", NULL);
+    if (!dir) {
+        pr_err("Failed to create debugfs directory for iommu_pinmig :(\n");
+        return -ENOMEM;
+    }
+
+    file = debugfs_create_file("curr_pfn", 0666, dir, NULL, &fops);
+    if (!file) {
+        pr_err("Failed to create debugfs curr_pfn file\n");
+        debugfs_remove(dir);
+        return -ENOMEM;
+    }
+
+
+    pr_info("iommu_pinmig debugfs interface initialized\n");
+    return 0;
+}
+
+void __exit iommu_pinmig_debugfs_exit(void)
+{
+    debugfs_remove(file);
+    debugfs_remove(dir);
+    pr_info("iommu_pinmig debugfs interface removed\n");
+}
+
+
+// pinmig - end
+
+
 
 #define ROOT_SIZE		VTD_PAGE_SIZE
 #define CONTEXT_SIZE		VTD_PAGE_SIZE
@@ -2288,7 +2350,9 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 			// pr_info("the important and sanity check = %d", virt_to_kpte((long unsigned int)phys_to_virt(phys_pfn))->pte == pte);
 			trace_printk("IOMMU-MAP: pfn = %lu\n", phys_pfn);
 			alias_iommu_create_rmap(&domain->domain, phys_pfn);
+			curr_pfn = phys_pfn;
 		}
+		// here - omer
 		iov_pfn += lvl_pages;
 		phys_pfn += lvl_pages;
 		pteval += lvl_pages * VTD_PAGE_SIZE;
@@ -3814,6 +3878,17 @@ int __init intel_iommu_init(void)
 	int ret = -ENODEV;
 	struct dmar_drhd_unit *drhd;
 	struct intel_iommu *iommu;
+
+
+	// pinmig 
+
+	pr_info("OMER: once intel_iommu_init\n");
+	int retv = iommu_pinmig_debugfs_init();
+	if (retv){
+		pr_info("Calling iommu_pinmig_debugfs_init from intel_iommu_init failed!!!!!!!!!");
+	}
+
+	// pinmig
 
 	/*
 	 * Intel IOMMU is required for a TXT/tboot launch or platform

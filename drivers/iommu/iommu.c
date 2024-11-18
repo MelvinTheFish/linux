@@ -39,7 +39,7 @@
 #include "iommu-sva.h"
 #include "iommu-priv.h"
 
-#define DAUBE_TRACE 1 // Change this to 0 to disable debugging
+#define DAUBE_TRACE 0 // Change this to 0 to disable debugging
 
 // Conditional Debuggng Macro
 #if DAUBE_TRACE
