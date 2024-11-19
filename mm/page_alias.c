@@ -16,6 +16,18 @@
 #define KERNEL_RMAP 0
 #define IOMMU_RMAP 1
 
+
+#define DAUBE_DBG 1 // Change this to 0 to disable debugging
+
+// Conditional Debugging Macro
+#if DAUBE_DBG
+#define makpitz_dbg(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define makpitz_dbg(fmt, ...)
+#endif
+
+
+
 struct iommu_rmap {
 	struct iommu_domain *domain;
 	unsigned long phys_pfn;
@@ -98,34 +110,32 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn
 	 * doesn't already exist
 	 */
 	// pr_info("in function %s", __func__);
+	// makpitz_dbg("In %s, creating rmpa to page of pfn: %lu\n", __func__, phys_pfn);
 	struct iommu_rmap new_rmap = {.domain = domain, .phys_pfn = phys_pfn};
 	struct page *page = pfn_to_page(phys_pfn);
 	// pr_info("the page in alias_iommu_create_rmap in = %ld\n", (unsigned long)&page);
 	BUG_ON(!page);
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext){
-		pr_info("In function %s, page_ext is null,PFN=%lx,  but everything is chill\n", __func__,phys_pfn);
+		// makpitz_dbg("In function %s, page_ext is null,PFN=%lu,  but everything is ok\n", __func__, phys_pfn);
 		return;
 	}
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
-	struct iommu_rmap old_rmap = page_alias->iommu_rmap;
 	// pr_info("shutaf1!");
 	// pr_info("is page alias null : %d\n", page_alias==NULL);
 	if(!page_alias){
+		// makpitz_dbg("In %s, no page alias for this page struct so creating one\n", __func__);
 		set_page_alias(page);
 		page_ext = page_ext_get(page);
 		page_alias = page_ext_data(page_ext, &page_alias_ops);
 	}
+	// struct iommu_rmap old_rmap = page_alias->iommu_rmap;TODO: needs to exist for cmxchg
 	// pr_info("is page alias null : %d\n", page_alias==NULL);
 	// pr_info("is page ext null : %d\n", page_ext==NULL);
-
-
-		
 	if(!atomic_inc_not_zero(&page_alias->iommu_ref_count)){
-		// first time (?)
-		// pr_info("shutaf2");
-		cmpxchg((unsigned long *)&(page_alias->iommu_rmap), *(unsigned long *)(&old_rmap), *(unsigned long *)(&new_rmap));
-	// 	pr_info("shutaf3");
+		// entered only if was zero so now it's 1
+		// cmpxchg((unsigned long *)&(page_alias->iommu_rmap), *(unsigned long *)(&old_rmap), *(unsigned long *)(&new_rmap)); TODO: return this, but make it work. this does not work, and cannot work bc cmpxchg is up to a word length which is less then size of iommu_rmap struct
+		page_alias->iommu_rmap = new_rmap; //TODO: really need to use cmpxchg
 		atomic_inc(&page_alias->iommu_ref_count);
 	// 	pr_info("shutaf4");
 	}
@@ -331,6 +341,12 @@ void end_pinned_migration(struct page *page){
 }
 
 int call_dma_migrate_page(struct page *page, bool prepare, struct folio *folio){
+	/*
+	args:
+	page- Struct page of the page to migrate
+	prepare- Prepare for migration by turning off the dirty bit (1), or do the migration itself (0)
+	folio- The new folio of the page (new location). If prepare is 1, this will be ignored.
+	*/
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
 	struct iommu_rmap iommu_rmap = page_alias->iommu_rmap;
@@ -353,6 +369,6 @@ void alias_iommu_free_rmap(unsigned long phys_pfn){
 
 	atomic_set(&page_alias->iommu_ref_count, 0);
 	page_alias->iommu_rmap = empty_rmap;
-
+	
 	page_ext_put(page_ext);
 }

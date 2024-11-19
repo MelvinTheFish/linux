@@ -815,15 +815,20 @@ int folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 	}
 	folio_copy(newfolio, folio);
 	if (pinned) {
-		if (dma_pinned) 
-			if (call_dma_migrate_page(page, false, newfolio) < 0)
+		if (dma_pinned){
+			if (call_dma_migrate_page(page, false, newfolio) < 0){
 				return -EPINMIGF;
-		if (kernel_pinned) 
-			if (kernel_migrate_pinned_page_commit(newfolio, folio, dma_pinned) != MIGRATEPAGE_SUCCESS)
+			}
+			makpitz_dbg("in %s, intel_migrate_page succeeded!\n", __func__);
+		}
+		if (kernel_pinned){
+			if (kernel_migrate_pinned_page_commit(newfolio, folio, dma_pinned) != MIGRATEPAGE_SUCCESS){
 				return -EPINMIGF;
+			}
+		}
 	}
 	folio_migrate_flags(newfolio, folio);
-	return MIGRATEPAGE_SUCCESS;
+	return MIGRATEPAGE_SUCCESS; //0
 }
 EXPORT_SYMBOL(folio_migrate_copy);
 

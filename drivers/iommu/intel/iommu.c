@@ -36,6 +36,16 @@
 #include <linux/debugfs.h>
 
 
+#define DAUBE_DBG 1 // Change this to 0 to disable debugging
+
+// Conditional Debugging Macro
+#if DAUBE_DBG
+#define makpitz_dbg(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#else
+#define makpitz_dbg(fmt, ...)
+#endif
+
+
 
 // pinmig - start
 
@@ -4948,27 +4958,34 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 		}
 		return 0;
 	}
-	pr_info("out after prepare\n");
-	if (young || dirty)
+	pr_info("######IOMMU-MAP: out after prepare\n");
+	if (young || dirty){
+		makpitz_dbg("######IOMMU-MAP: young or dirty bits are on!\n");
 		return -EBUSY;
+	}
+
 
 	new_pte = pte;
 	new_pte.val &= ~VTD_PAGE_MASK;
 	unsigned long new_pfn = page_to_dma_pfn(&new_folio->page); // w/o dma
-	new_pte.val |= new_pfn << VTD_PAGE_SHIFT;
-    struct page *new_page = folio_page(new_folio, 0);
-    __set_page_alias(new_page);
+	new_pte.val |= (new_pfn << VTD_PAGE_SHIFT);
+	struct page *new_page = folio_page(new_folio, 0);
+	__set_page_alias(new_page);//Why is it not only if succeeded? or even why is this needed bc doesnt every page allready have this?
 	// pr_info("the page in intel_migrate_page in = %ld\n", (unsigned long)&new_page);
-	trace_printk("IOMMU-MAP: create rmap");
-    alias_iommu_create_rmap(domain, new_pfn);
-	// pr_info("opened iommu alias");
+	trace_printk("######IOMMU-MAP: create rmap");
+	alias_iommu_create_rmap(domain, new_pfn);
+	
+	makpitz_dbg("######IOMMU-MAP: old pfn: %lu, new_pfn: %lu\n", pfn, new_pfn);
 
-    // alias_vmap(new_page);
-    // folio_ref_add(new_folio, 1);
+	// folio_ref_add(new_folio, 1);
 
-	/* If the access bit is clean we would not need a TLB flush */
-	if (!try_cmpxchg64(&ptep->val, &pte.val, new_pte.val))
+	/* If the access bit is clean we would not need a TLB flush what does this mean? tlb flush only happens in prepare so it happens anyway*/
+	if (!try_cmpxchg64(&ptep->val, &pte.val, new_pte.val)){
+		makpitz_dbg("######IOMMU-MAP: cmpxchg failed!");
 		return -EPINMIGF;
+	}
+	// __set_page_alias(new_page);//should be moved here
+	makpitz_dbg("######IOMMU-MAP: cmpxchg succeeded!!!!!! DMA pinmig!!!!!!!!!!!");
 	return 0;
 } 
 
