@@ -51,25 +51,43 @@
 
 static unsigned long curr_pfn = 0;
 static struct dentry *dir, *file;
+static int sleep_time = 0;
 
-static ssize_t curr_pfn_read(struct file *filp, char __user *buffer, size_t len, loff_t *offset)
+static ssize_t sleep_time_read(struct file *filp, char __user *buffer, size_t len, loff_t *offset)
 {
     char buf[64];
     int ret;
 
-    ret = snprintf(buf, sizeof(buf), "%lu\n", curr_pfn);
+    ret = snprintf(buf, sizeof(buf), "%d\n", sleep_time);
     return simple_read_from_buffer(buffer, len, offset, buf, ret);
 }
 
-static ssize_t curr_pfn_write(struct file *filp, const char __user *buffer, size_t len, loff_t *offset)
+static ssize_t sleep_time_write(struct file *filp, const char __user *buffer, size_t len, loff_t *offset)
 {
-    return 0;
+    char buf[64];
+
+    if (len > sizeof(buf) - 1)
+        return -EINVAL;
+
+    if (copy_from_user(buf, buffer, len))
+        return -EFAULT;
+
+    buf[len] = '\0';
+    int res;
+    res = kstrtoint(buf, 10, &sleep_time); //char, base, *result
+    if (res){
+	pr_info("Failed to convert string to int in %s\n", __func__);
+	return res;
+    }
+
+    pr_info("New sleep mega time: %d\n", sleep_time);
+    return len;
 }
 
 static const struct file_operations fops = {
     .owner = THIS_MODULE,
-    .read = curr_pfn_read,
-    .write = curr_pfn_write,
+    .read = sleep_time_read,
+    .write = sleep_time_write,
 };
 
 
@@ -82,9 +100,9 @@ int __init iommu_pinmig_debugfs_init(void)
         return -ENOMEM;
     }
 
-    file = debugfs_create_file("curr_pfn", 0666, dir, NULL, &fops);
+    file = debugfs_create_file("sleep_time", 0666, dir, NULL, &fops);
     if (!file) {
-        pr_err("Failed to create debugfs curr_pfn file\n");
+        pr_err("Failed to create debugfs sleep_time file\n");
         debugfs_remove(dir);
         return -ENOMEM;
     }
@@ -4959,8 +4977,9 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 		return 0;
 	}
 	pr_info("######IOMMU-MAP: out after prepare\n");
+
 	if (young || dirty){
-		makpitz_dbg("######IOMMU-MAP: young or dirty bits are on!\n");
+		makpitz_dbg("######IOMMU-MAP: young or dirty bits are on!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2\n");
 		return -EBUSY;
 	}
 
@@ -4979,9 +4998,15 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 
 	// folio_ref_add(new_folio, 1);
 
+	//D-le
+	
+	if (sleep_time > 0)
+		mdelay(sleep_time);
+
+
 	/* If the access bit is clean we would not need a TLB flush what does this mean? tlb flush only happens in prepare so it happens anyway*/
 	if (!try_cmpxchg64(&ptep->val, &pte.val, new_pte.val)){
-		makpitz_dbg("######IOMMU-MAP: cmpxchg failed!");
+		makpitz_dbg("######IOMMU-MAP: cmpxchg failed!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 		return -EPINMIGF;
 	}
 	// __set_page_alias(new_page);//should be moved here

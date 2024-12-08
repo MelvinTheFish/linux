@@ -132,7 +132,7 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn
 	// struct iommu_rmap old_rmap = page_alias->iommu_rmap;TODO: needs to exist for cmxchg
 	// pr_info("is page alias null : %d\n", page_alias==NULL);
 	// pr_info("is page ext null : %d\n", page_ext==NULL);
-	if(!atomic_inc_not_zero(&page_alias->iommu_ref_count)){
+	if(!atomic_cmpxchg(&page_alias->iommu_ref_count, 0, 1)){
 		// entered only if was zero so now it's 1
 		// cmpxchg((unsigned long *)&(page_alias->iommu_rmap), *(unsigned long *)(&old_rmap), *(unsigned long *)(&new_rmap)); TODO: return this, but make it work. this does not work, and cannot work bc cmpxchg is up to a word length which is less then size of iommu_rmap struct
 		page_alias->iommu_rmap = new_rmap; //TODO: really need to use cmpxchg
