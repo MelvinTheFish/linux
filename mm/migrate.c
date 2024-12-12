@@ -937,8 +937,10 @@ static int __buffer_migrate_folio(struct address_space *mapping,
 				  enum migrate_mode mode, bool check_refs)
 {
 	struct buffer_head *bh, *head;
-	int rc;
 	int expected_count;
+	bool kernel_pinned;
+	bool dma_pinned;
+	int rc;
 
 	head = folio_buffers(src);
 	if (!head) {
@@ -949,9 +951,17 @@ static int __buffer_migrate_folio(struct address_space *mapping,
 
 	/* Check whether page does not have extra refs before we do more work */
 	expected_count = folio_expected_refs(mapping, src);
+	kernel_pinned = is_alias_kernel_page(&src->page);
+	dma_pinned = is_alias_dma_page(&src->page);
+
 	if (folio_ref_count(src) != expected_count) {
-		return -EAGAIN;
+		if (dma_pinned && !kernel_pinned) {//if dma pinned, we can ignore the refcount because we dont update it still. if kernel pinned, we need to check it.
+			makpitz_dbg("in %s, refcount wrong but dma pinned so ignoring\n", __func__);
+		} else{
+			return -EAGAIN;
+		}		
 	}
+
 	if (!buffer_migrate_lock_buffers(head, mode))
 		return -EAGAIN;
 
