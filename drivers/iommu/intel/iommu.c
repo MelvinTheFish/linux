@@ -4974,12 +4974,14 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 			xa_for_each(&dmar_domain->iommu_array, i, info)
 				iommu_flush_iotlb_psi(info->iommu, dmar_domain, pfn, 1, 0, 0);
 		}
+		trace_printk("######%s: cleared young and dirty bits----------------------------\n", __func__);
 		return 0;
 	}
 	pr_info("######IOMMU-MAP: out after prepare\n");
 
 	if (young || dirty){
-		makpitz_dbg("######IOMMU-MAP: young or dirty bits are on!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2\n");
+		makpitz_dbg("######IOMMU-MAP: before cmpxchg even, young or dirty bits are on!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2\n");
+		trace_printk("######%s: before cmpxchg even, young or dirty bits are on!@@@@@@@@@@@@@@@@@\n", __func__);
 		return -EBUSY;
 	}
 
@@ -5004,13 +5006,16 @@ static int intel_migrate_page(struct iommu_domain *domain, unsigned long pfn, st
 		mdelay(sleep_time);
 
 
+	trace_printk("######%s: checking young and dirty bits----------------------------\n", __func__);
 	/* If the access bit is clean we would not need a TLB flush what does this mean? tlb flush only happens in prepare so it happens anyway*/
 	if (!try_cmpxchg64(&ptep->val, &pte.val, new_pte.val)){
 		makpitz_dbg("######IOMMU-MAP: cmpxchg failed!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+		trace_printk("######%s: cmpxchg failed!@@@@@@@@@@@@@@@@@\n", __func__);
 		return -EPINMIGF;
 	}
 	// __set_page_alias(new_page);//should be moved here
 	makpitz_dbg("######IOMMU-MAP: cmpxchg succeeded!!!!!! DMA pinmig!!!!!!!!!!!");
+	trace_printk("######%s: cmpxchg succeeded!!!!!!!!1\n", __func__);
 	return 0;
 } 
 
