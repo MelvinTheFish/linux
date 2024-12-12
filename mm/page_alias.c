@@ -56,6 +56,7 @@ struct page_alias {
 	int iommu_ref_count;
 	void* kernel_rmap;
 	struct iommu_rmap iommu_rmap;
+	spinlock_t lock;
 	// bit_who_is_the_owner
 };
 
@@ -87,7 +88,8 @@ static noinline void __set_page_ext_alias(struct page_ext *page_ext)
 	// atomic_set(&page_alias->do_not_move, 0);
 	atomic_set(&page_alias->do_not_move, -2);
 	atomic_set(&page_alias->kernel_ref_count, 0);
-	iommu_ref_count = 0;//is it a problem if not atomic? because why would multiple proccesses initialize the same page ext?
+	spin_lock_init(&page_alias->lock);
+	page_alias->iommu_ref_count = 0;//is it a problem if not atomic? because why would multiple proccesses initialize the same page ext?
 	page_alias->iommu_rmap = empty_rmap;
 	page_alias->kernel_rmap = NULL;
 }
@@ -107,16 +109,16 @@ noinline void __set_page_alias(struct page *page)
 void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn) {
 	struct page *page = pfn_to_page(phys_pfn);
 	struct iommu_rmap new_rmap = {
-	.domain = domain,
-	.phys_pfn = phys_pfn
+		.domain = domain,
+		.phys_pfn = phys_pfn
 	};
 	BUG_ON(!page);
-	lock_page(page);
+	
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext) {
-		unlock_page(page);
 		return;
 	}
+	
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
 	if (!page_alias) {
 		set_page_alias(page);
@@ -124,43 +126,44 @@ void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn
 		page_ext = page_ext_get(page);
 		page_alias = page_ext_data(page_ext, &page_alias_ops);
 	}
+
+	spin_lock(&page_alias->lock);  // Acquire spinlock
+	
 	if (page_alias->iommu_ref_count == 0) {
 		page_alias->iommu_rmap = new_rmap;
 		page_alias->iommu_ref_count = 1;
 	} else {
 		page_alias->iommu_ref_count++;
 	}
+	
+	spin_unlock(&page_alias->lock);  // Release spinlock
 	page_ext_put(page_ext);
-	unlock_page(page);
 }
 
 void alias_iommu_remove_rmap(unsigned long phys_pfn) {
 	struct page *page = pfn_to_page(phys_pfn);
 	BUG_ON(!page);
-
-	lock_page(page);
-
+	
 	struct page_ext *page_ext = page_ext_get(page);
 	if (!page_ext) {
-		unlock_page(page);
 		return;
 	}
-
+	
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
-
+	
+	spin_lock(&page_alias->lock);  // Acquire spinlock
+	
 	BUG_ON(page_alias->iommu_ref_count == 0);
-
 	if (page_alias->iommu_ref_count > 1) {
 		page_alias->iommu_ref_count--;
 	} else if (page_alias->iommu_ref_count == 1) {
 		page_alias->iommu_ref_count = 0;
 		page_alias->iommu_rmap = empty_rmap;
 	}
-
+	
+	spin_unlock(&page_alias->lock);  // Release spinlock
 	page_ext_put(page_ext);
-	unlock_page(page);
 }
-
 
 void *alias_vmap(struct page *page)
 {
@@ -252,6 +255,8 @@ void alias_page_close(struct page *page)
 	page_ext_put(page_ext);
 	put_page(page);
 }
+
+
 
 int get_alias_refcount(struct page *page)
 {

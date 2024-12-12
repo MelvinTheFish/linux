@@ -2,7 +2,7 @@
 VERSION = 6
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION = -iommu-fix-create-rmap
+EXTRAVERSION = -iommu-fix-pagelock
 NAME = Hurr durr I'ma ninja sloth
 
 # *DOCUMENTATION*
