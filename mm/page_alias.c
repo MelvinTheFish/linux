@@ -53,7 +53,7 @@ struct page_alias {
 	 * 1+: counter of places that currently hold the page struct
 	 */
 	atomic_t kernel_ref_count;
-	atomic_t iommu_ref_count;
+	int iommu_ref_count;
 	void* kernel_rmap;
 	struct iommu_rmap iommu_rmap;
 	// bit_who_is_the_owner
@@ -87,7 +87,7 @@ static noinline void __set_page_ext_alias(struct page_ext *page_ext)
 	// atomic_set(&page_alias->do_not_move, 0);
 	atomic_set(&page_alias->do_not_move, -2);
 	atomic_set(&page_alias->kernel_ref_count, 0);
-	atomic_set(&page_alias->iommu_ref_count, 0);
+	iommu_ref_count = 0;//is it a problem if not atomic? because why would multiple proccesses initialize the same page ext?
 	page_alias->iommu_rmap = empty_rmap;
 	page_alias->kernel_rmap = NULL;
 }
@@ -258,8 +258,8 @@ int get_alias_refcount(struct page *page)
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
 	page_ext_data(page_ext, &page_alias_ops);
-	int i = atomic_read(&(page_alias->kernel_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
-	int j = atomic_read(&(page_alias->iommu_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
+	int i = atomic_read(&(page_alias->kernel_ref_count));
+	int j = page_alias->iommu_ref_count; //doesnt matter if attomic or not here, becuase anyway after this is called it can change.
 	page_ext_put(page_ext);
 	pr_info("refcounts: {kernel  %d, iommu: %d}", i, j);
 	//TODO: what about iommu references? maybe our iommu reference doesnt count because we hold the physicak address and not a pointer to the virtual one.
@@ -306,7 +306,7 @@ void *get_alias_rmap(struct page *page)
 	struct page_alias *page_alias =
 		page_ext_data(page_ext, &page_alias_ops);
 	void* ret;
-	int i = atomic_read(&(page_alias->iommu_ref_count)); //for debug, remove later
+	int i = page_alias->iommu_ref_count; //for debug, remove later
 	if((page_alias->kernel_rmap) && (i)){
 		pr_info("both kernel and iommu rmaps!\n");
 	}
@@ -368,7 +368,7 @@ void alias_iommu_free_rmap(unsigned long phys_pfn){
 	BUG_ON(!page_ext);
 	page_alias = page_ext_data(page_ext, &page_alias_ops);
 
-	atomic_set(&page_alias->iommu_ref_count, 0);
+	page_alias->iommu_ref_count = 0;
 	page_alias->iommu_rmap = empty_rmap;
 	
 	page_ext_put(page_ext);
