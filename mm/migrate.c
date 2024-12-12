@@ -439,12 +439,14 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 			  pgoff_t *save_index,
 			  struct address_space *save_mapping)
 {
-        makpitz_trace("In %s\n", __func__);
-	XA_STATE(xas, &mapping->i_pages, folio_index(folio));
+	int expected_count = folio_expected_refs(mapping, folio) + extra_count;
+	bool kernel_pinned = is_alias_kernel_page(folio_page(folio, 0));
+	bool dma_pinned = is_alias_dma_page(folio_page(folio, 0));
+	long nr = folio_nr_pages(folio);
 	struct zone *oldzone, *newzone;
 	int dirty;
-	int expected_count = folio_expected_refs(mapping, folio) + extra_count;
-	long nr = folio_nr_pages(folio);
+	XA_STATE(xas, &mapping->i_pages, folio_index(folio));
+        makpitz_trace("In %s\n", __func__);
 	if (!mapping) {
 		/* Anonymous page without mapping */
 		int count = folio_ref_count(folio);
@@ -453,9 +455,13 @@ int folio_migrate_mapping(struct address_space *mapping, struct folio *newfolio,
 			count -= (GUP_PIN_COUNTING_BIAS - 1);
 		// }
 		if (count != expected_count) {
-			makpitz_trace("ref count is wrong. expected: %d, got: %d\n",
-				expected_count, count);
-			return -EAGAIN;
+			if (dma_pinned && !kernel_pinned){
+				makpitz_dbg("In %s, dma pinned so ignoring ref count mismatch\n", __func__);
+			} else{
+				makpitz_trace("ref count is wrong. expected: %d, got: %d\n",
+					expected_count, count);
+				return -EAGAIN;
+			}
 		}
 		/* No turning back from here, until now. */
 		if (save_index)
