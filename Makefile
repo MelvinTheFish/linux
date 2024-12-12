@@ -2,7 +2,7 @@
 VERSION = 6
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION = -iommu-v17-delay-on-mig
+EXTRAVERSION = -iommu-fix-create-rmap
 NAME = Hurr durr I'ma ninja sloth
 
 # *DOCUMENTATION*

@@ -105,60 +105,61 @@ noinline void __set_page_alias(struct page *page)
 
 
 void alias_iommu_create_rmap(struct iommu_domain *domain, unsigned long phys_pfn) {
-	/*
-	 * create an iommu rmap for a single page if it 
-	 * doesn't already exist
-	 */
-	// pr_info("in function %s", __func__);
-	// makpitz_dbg("In %s, creating rmpa to page of pfn: %lu\n", __func__, phys_pfn);
-	struct iommu_rmap new_rmap = {.domain = domain, .phys_pfn = phys_pfn};
 	struct page *page = pfn_to_page(phys_pfn);
-	// pr_info("the page in alias_iommu_create_rmap in = %ld\n", (unsigned long)&page);
+	struct iommu_rmap new_rmap = {
+	.domain = domain,
+	.phys_pfn = phys_pfn
+	};
 	BUG_ON(!page);
+	lock_page(page);
 	struct page_ext *page_ext = page_ext_get(page);
-	if (!page_ext){
-		// makpitz_dbg("In function %s, page_ext is null,PFN=%lu,  but everything is ok\n", __func__, phys_pfn);
+	if (!page_ext) {
+		unlock_page(page);
 		return;
 	}
 	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
-	// pr_info("shutaf1!");
-	// pr_info("is page alias null : %d\n", page_alias==NULL);
-	if(!page_alias){
-		// makpitz_dbg("In %s, no page alias for this page struct so creating one\n", __func__);
+	if (!page_alias) {
 		set_page_alias(page);
+		page_ext_put(page_ext);
 		page_ext = page_ext_get(page);
 		page_alias = page_ext_data(page_ext, &page_alias_ops);
 	}
-	// struct iommu_rmap old_rmap = page_alias->iommu_rmap;TODO: needs to exist for cmxchg
-	// pr_info("is page alias null : %d\n", page_alias==NULL);
-	// pr_info("is page ext null : %d\n", page_ext==NULL);
-	if(!atomic_cmpxchg(&page_alias->iommu_ref_count, 0, 1)){
-		// entered only if was zero so now it's 1
-		// cmpxchg((unsigned long *)&(page_alias->iommu_rmap), *(unsigned long *)(&old_rmap), *(unsigned long *)(&new_rmap)); TODO: return this, but make it work. this does not work, and cannot work bc cmpxchg is up to a word length which is less then size of iommu_rmap struct
-		page_alias->iommu_rmap = new_rmap; //TODO: really need to use cmpxchg
-		// atomic_inc(&page_alias->iommu_ref_count);why? only got here if it was 0 anyway... what the hell did we do here when we were young (pte.young)?
-	// 	pr_info("shutaf4");
+	if (page_alias->iommu_ref_count == 0) {
+		page_alias->iommu_rmap = new_rmap;
+		page_alias->iommu_ref_count = 1;
+	} else {
+		page_alias->iommu_ref_count++;
 	}
 	page_ext_put(page_ext);
+	unlock_page(page);
 }
 
 void alias_iommu_remove_rmap(unsigned long phys_pfn) {
-	/* 
-	 * remove an iommu rmap for a single page 
-	 */
 	struct page *page = pfn_to_page(phys_pfn);
 	BUG_ON(!page);
-	struct page_ext *page_ext = page_ext_get(page);
-	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
-	if (!atomic_add_unless(&page_alias->iommu_ref_count, -1, 1)){
-		if(atomic_cmpxchg(&page_alias->iommu_ref_count, 1, 0))
-			page_alias->iommu_rmap = empty_rmap;
-		else
-			atomic_dec(&page_alias->iommu_ref_count);
-	}
-	page_ext_put(page_ext); 
-}
 
+	lock_page(page);
+
+	struct page_ext *page_ext = page_ext_get(page);
+	if (!page_ext) {
+		unlock_page(page);
+		return;
+	}
+
+	struct page_alias *page_alias = page_ext_data(page_ext, &page_alias_ops);
+
+	BUG_ON(page_alias->iommu_ref_count == 0);
+
+	if (page_alias->iommu_ref_count > 1) {
+		page_alias->iommu_ref_count--;
+	} else if (page_alias->iommu_ref_count == 1) {
+		page_alias->iommu_ref_count = 0;
+		page_alias->iommu_rmap = empty_rmap;
+	}
+
+	page_ext_put(page_ext);
+	unlock_page(page);
+}
 
 
 void *alias_vmap(struct page *page)
@@ -256,7 +257,7 @@ int get_alias_refcount(struct page *page)
 {
 	struct page_ext *page_ext = page_ext_get(page);
 	struct page_alias *page_alias =
-		page_ext_data(page_ext, &page_alias_ops);
+	page_ext_data(page_ext, &page_alias_ops);
 	int i = atomic_read(&(page_alias->kernel_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
 	int j = atomic_read(&(page_alias->iommu_ref_count)); //need to be atomic, for now returning int because in migrate expected ref count is an int...
 	page_ext_put(page_ext);
